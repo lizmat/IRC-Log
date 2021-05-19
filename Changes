@@ -1,6 +1,7 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+    - Changed default branch
 
 0.0.3  2021-05-19T17:50:07+02:00
     - Seems tagging got mixed up somehow
