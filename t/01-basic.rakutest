@@ -1,0 +1,8 @@
+use Test;
+use IRC::Log;
+
+plan 1;
+
+pass "It compiled!"
+
+# vim: expandtab shiftwidth=4

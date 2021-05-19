@@ -1,0 +1,12 @@
+Revision history for IRC-Log
+
+{{$NEXT}}
+
+0.0.3  2021-05-19T17:50:07+02:00
+    - Seems tagging got mixed up somehow
+
+0.0.2  2021-05-19T17:32:10+02:00
+    - Tweaks to make IRC::Log::Colabti work
+
+0.0.1  2021-05-19T17:27:07+02:00
+    - Initial version
