@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.4>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.5>:auth<cpan:ELIZABETH> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -34,16 +34,18 @@ role IRC::Log:ver<0.0.4>:auth<cpan:ELIZABETH> {
       IO:D $path,
       Date() $date = self.IO2Date($path)
     ) {
-        self.CREATE!INIT.parse($path.slurp(:enc("utf8-c8")), $date);
-        self
+        my $instance := self.CREATE!INIT;
+        $instance.parse($path.slurp(:enc("utf8-c8")), $date);
+        $instance
     }
 
     multi method new(::?CLASS:U:
       Str:D $slurped,
       Date() $date
     ) {
-        self.CREATE!INIT.parse($slurped, $date);
-        self
+        my $instance := self.CREATE!INIT;
+        $instance.parse($slurped, $date);
+        $instance
     }
 
 #-------------------------------------------------------------------------------
