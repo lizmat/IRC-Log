@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.3>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.4>:auth<cpan:ELIZABETH> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -34,14 +34,16 @@ role IRC::Log:ver<0.0.3>:auth<cpan:ELIZABETH> {
       IO:D $path,
       Date() $date = self.IO2Date($path)
     ) {
-        self.CREATE!INIT.parse($path.slurp(:enc("utf8-c8")), $date)
+        self.CREATE!INIT.parse($path.slurp(:enc("utf8-c8")), $date);
+        self
     }
 
     multi method new(::?CLASS:U:
       Str:D $slurped,
       Date() $date
     ) {
-        self.CREATE!INIT.parse($slurped, $date)
+        self.CREATE!INIT.parse($slurped, $date);
+        self
     }
 
 #-------------------------------------------------------------------------------
@@ -195,6 +197,9 @@ use IRC::Log;
 
 class IRC::Log::Foo does IRC::Log {
     method parse($slurped, $date) {
+        # Nil for already parsed and no change
+        #   0 for initial parse
+        # > 0 number of entries added after update
     }
 }
 

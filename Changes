@@ -1,7 +1,10 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+
+0.0.4  2021-05-23T22:50:25+02:00
     - Changed default branch
+    - Expect .update to return Nil, 0 or > 0
 
 0.0.3  2021-05-19T17:50:07+02:00
     - Seems tagging got mixed up somehow

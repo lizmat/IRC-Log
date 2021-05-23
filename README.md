@@ -13,6 +13,9 @@ use IRC::Log;
 
 class IRC::Log::Foo does IRC::Log {
     method parse($slurped, $date) {
+        # Nil for already parsed and no change
+        #   0 for initial parse
+        # > 0 number of entries added after update
     }
 }
 
