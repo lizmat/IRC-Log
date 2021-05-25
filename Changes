@@ -2,8 +2,11 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.6  2021-05-25T17:52:53+02:00
+    - Make Message.gist be the same what IRC::Log::Colabti parses
+
 0.0.5  2021-05-23T23:13:45+02:00
-    - Oops.  .new should not return its type object.  Need more tests.
+    - Oops.  .new should not return its type object.  Need more tests
 
 0.0.4  2021-05-23T22:50:25+02:00
     - Changed default branch

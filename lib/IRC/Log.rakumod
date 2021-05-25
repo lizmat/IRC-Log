@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.5>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.6>:auth<cpan:ELIZABETH> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -150,6 +150,7 @@ class IRC::Log::Kick does IRC::Log::Entry {
 class IRC::Log::Message does IRC::Log::Entry {
     has Str $.text is built(:bind);
 
+    method gist() { '[' ~ self.hh-mm ~ '] <' ~ $.nick ~ '> ' ~ $.message }
     method sender() { $!nick }
     method message() { $!text }
     method prefix(--> '') { }
