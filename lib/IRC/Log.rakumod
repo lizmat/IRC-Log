@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.6>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.7>:auth<cpan:ELIZABETH> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -110,6 +110,15 @@ role IRC::Log::Entry {
     method date()     { $!log.date     }
     method entries()  { $!log.entries  }
     method problems() { $!log.problems }
+
+    method prev() {
+        if self.pos -> int $pos {
+            $!log.entries[$pos - 1]
+        }
+    }
+    method next() {
+        $!log.entries[self.pos + 1] // Empty
+    }
 
     method prefix(--> '*** ') { }
     method gist() {
@@ -458,6 +467,10 @@ The text representation of the entry.
 
 The minute (in UTC) the entry was added to the log.
 
+=head3 next
+
+The next entry in this log (if any).
+
 =head3 nick
 
 The nick of the user that originated the entry in the log.
@@ -473,6 +486,10 @@ The position of this entry in the C<entries> of the C<log> of this entry.
 =head3 prefix
 
 The prefix used in creating the C<gist> of this entry.
+
+=head3 prev
+
+The previous entry in this log (if any).
 
 =head3 problems
 

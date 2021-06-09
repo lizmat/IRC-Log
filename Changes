@@ -2,6 +2,9 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.7  2021-06-09T19:47:15+02:00
+    - Add .next / .prev entry methods.
+
 0.0.6  2021-05-25T17:52:53+02:00
     - Make Message.gist be the same what IRC::Log::Colabti parses
 

@@ -238,6 +238,10 @@ The text representation of the entry.
 
 The minute (in UTC) the entry was added to the log.
 
+### next
+
+The next entry in this log (if any).
+
 ### nick
 
 The nick of the user that originated the entry in the log.
@@ -253,6 +257,10 @@ The position of this entry in the `entries` of the `log` of this entry.
 ### prefix
 
 The prefix used in creating the `gist` of this entry.
+
+### prev
+
+The previous entry in this log (if any).
 
 ### problems
 
