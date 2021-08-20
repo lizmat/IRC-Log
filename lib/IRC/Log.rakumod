@@ -1,11 +1,12 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.8>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.9>:auth<cpan:ELIZABETH> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
     has Int  $.nr-control-entries;
     has Int  $.nr-conversation-entries;
+    has      $.last-topic-change;
     has      @.problems;
     has      %.nicks;
     has      %!state;  # hash with final state of internal parsing
@@ -59,10 +60,6 @@ role IRC::Log:ver<0.0.8>:auth<cpan:ELIZABETH> {
     }
     method this-target(::?CLASS:D: Str:D $target) {
         $!entries.List.first($target eq *.target)
-    }
-
-    method last-topic-change(::?CLASS:D:) {
-        $!entries.first(*.^name.ends-with('::Topic'), :end)
     }
 
     multi method update(::?CLASS:D: IO:D $path) {
