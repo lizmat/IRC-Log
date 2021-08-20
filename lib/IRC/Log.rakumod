@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.7>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.8>:auth<cpan:ELIZABETH> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -59,6 +59,10 @@ role IRC::Log:ver<0.0.7>:auth<cpan:ELIZABETH> {
     }
     method this-target(::?CLASS:D: Str:D $target) {
         $!entries.List.first($target eq *.target)
+    }
+
+    method last-topic-change(::?CLASS:D:) {
+        $!entries.first(*.^name.ends-with('::Topic'), :end)
     }
 
     multi method update(::?CLASS:D: IO:D $path) {
@@ -325,6 +329,17 @@ say $last-target;  # 2021-04-29
 =end code
 
 The C<last-target> instance method returns the C<target> of the last entry.
+
+=head2 last-topic-change
+
+=begin code :lang<raku>
+
+say $last-topic-change;  # liz changed topic to "hello world"
+
+=end code
+
+The C<last-topic-change> instance method returns the entry that contains the
+last change of topic.  Returns C<Nil> if there wasn't any topic change.
 
 =head2 nicks
 

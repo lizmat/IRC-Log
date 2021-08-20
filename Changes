@@ -2,6 +2,9 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.8  2021-08-20T10:51:15+02:00
+    - Add .last-topic-change instance method.
+
 0.0.7  2021-06-09T19:47:15+02:00
     - Add .next / .prev entry methods.
 

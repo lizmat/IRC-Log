@@ -116,6 +116,15 @@ say $last-target;  # 2021-04-29
 
 The `last-target` instance method returns the `target` of the last entry.
 
+last-topic-change
+-----------------
+
+```raku
+say $last-topic-change;  # liz changed topic to "hello world"
+```
+
+The `last-topic-change` instance method returns the entry that contains the last change of topic. Returns `Nil` if there wasn't any topic change.
+
 nicks
 -----
 
