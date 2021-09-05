@@ -2,8 +2,11 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.10  2021-09-05T21:23:01+02:00
+    - Move to the zef ecosystem.
+
 0.0.9  2021-08-20T12:43:20+02:00
-    - Delegate handling of last-topic-change to "parse" method
+    - Delegate handling of last-topic-change to "parse" method.
 
 0.0.8  2021-08-20T10:51:15+02:00
     - Add .last-topic-change instance method.
@@ -15,17 +18,17 @@ Revision history for IRC-Log
     - Make Message.gist be the same what IRC::Log::Colabti parses
 
 0.0.5  2021-05-23T23:13:45+02:00
-    - Oops.  .new should not return its type object.  Need more tests
+    - Oops.  .new should not return its type object.  Need more tests.
 
 0.0.4  2021-05-23T22:50:25+02:00
-    - Changed default branch
-    - Expect .update to return Nil, 0 or > 0
+    - Changed default branch.
+    - Expect .update to return Nil, 0 or > 0.
 
 0.0.3  2021-05-19T17:50:07+02:00
-    - Seems tagging got mixed up somehow
+    - Seems tagging got mixed up somehow.
 
 0.0.2  2021-05-19T17:32:10+02:00
-    - Tweaks to make IRC::Log::Colabti work
+    - Tweaks to make IRC::Log::Colabti work.
 
 0.0.1  2021-05-19T17:27:07+02:00
-    - Initial version
+    - Initial version.

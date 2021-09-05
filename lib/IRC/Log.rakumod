@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.9>:auth<cpan:ELIZABETH> {
+role IRC::Log:ver<0.0.10>:auth<zef:lizmat> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -574,7 +574,7 @@ The new topic that the user entered that resulted in this log entry.
 
 =head1 AUTHOR
 
-Elizabeth Mattijsen <liz@wenzperl.nl>
+Elizabeth Mattijsen <liz@raku.rocks>
 
 Source can be located at: https://github.com/lizmat/IRC-Log .
 Comments and Pull Requests are welcome.

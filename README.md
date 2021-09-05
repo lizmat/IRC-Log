@@ -346,7 +346,7 @@ The new topic that the user entered that resulted in this log entry.
 AUTHOR
 ======
 
-Elizabeth Mattijsen <liz@wenzperl.nl>
+Elizabeth Mattijsen <liz@raku.rocks>
 
 Source can be located at: https://github.com/lizmat/IRC-Log . Comments and Pull Requests are welcome.
 
