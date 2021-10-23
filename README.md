@@ -98,20 +98,38 @@ say $log.date;
 
 The `date` instance method returns the `Date` object for this log.
 
+first-entry
+-----------
+
+```raku
+say $log.first-entry;
+```
+
+The `first-entry` instance method returns the first entry of the log.
+
 first-target
 ------------
 
 ```raku
-say $first-target;  # 2021-04-23
+say $log.first-target;  # 2021-04-23
 ```
 
 The `first-target` instance method returns the `target` of the first entry.
+
+last-entry
+----------
+
+```raku
+say $log.last-entry;
+```
+
+The `last-entry` instance method returns the last entry of the log.
 
 last-target
 -----------
 
 ```raku
-say $last-target;  # 2021-04-29
+say $log.last-target;  # 2021-04-29
 ```
 
 The `last-target` instance method returns the `target` of the last entry.
@@ -120,7 +138,7 @@ last-topic-change
 -----------------
 
 ```raku
-say $last-topic-change;  # liz changed topic to "hello world"
+say $log.last-topic-change;  # liz changed topic to "hello world"
 ```
 
 The `last-topic-change` instance method returns the entry that contains the last change of topic. Returns `Nil` if there wasn't any topic change.

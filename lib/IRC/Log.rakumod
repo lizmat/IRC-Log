@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.10>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.11>:auth<zef:lizmat> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -52,12 +52,12 @@ role IRC::Log:ver<0.0.10>:auth<zef:lizmat> {
 #-------------------------------------------------------------------------------
 # Instance methods
 
-    method first-target(::?CLASS:D:) {
-        $!entries[0].target
-    }
-    method last-target(::?CLASS:D:) {
-        $!entries[$!entries.elems - 1].target
-    }
+    method first-entry(::?CLASS:D:) { $!entries[0] }
+    method last-entry( ::?CLASS:D:) { $!entries[$!entries.elems - 1] }
+
+    method first-target(::?CLASS:D:) { $!entries[0].target }
+    method last-target( ::?CLASS:D:) { $!entries[$!entries.elems - 1].target }
+
     method this-target(::?CLASS:D: Str:D $target) {
         $!entries.List.first($target eq *.target)
     }
@@ -307,21 +307,41 @@ say $log.date;
 
 The C<date> instance method returns the C<Date> object for this log.
 
+=head2 first-entry
+
+=begin code :lang<raku>
+
+say $log.first-entry;
+
+=end code
+
+The C<first-entry> instance method returns the first entry of the log.
+
 =head2 first-target
 
 =begin code :lang<raku>
 
-say $first-target;  # 2021-04-23
+say $log.first-target;  # 2021-04-23
 
 =end code
 
 The C<first-target> instance method returns the C<target> of the first entry.
 
+=head2 last-entry
+
+=begin code :lang<raku>
+
+say $log.last-entry;
+
+=end code
+
+The C<last-entry> instance method returns the last entry of the log.
+
 =head2 last-target
 
 =begin code :lang<raku>
 
-say $last-target;  # 2021-04-29
+say $log.last-target;  # 2021-04-29
 
 =end code
 
@@ -331,7 +351,7 @@ The C<last-target> instance method returns the C<target> of the last entry.
 
 =begin code :lang<raku>
 
-say $last-topic-change;  # liz changed topic to "hello world"
+say $log.last-topic-change;  # liz changed topic to "hello world"
 
 =end code
 
