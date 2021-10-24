@@ -2,6 +2,10 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.12  2021-10-24T13:28:40+02:00
+    - Subtle change in semantics of .next/.prev.  Instead
+      of returning Empty on end reached, they now return Nil
+
 0.0.11  2021-10-23T14:22:44+02:00
     - Added "first-entry" and "last-entry" methods
     - Fix some documentation typos

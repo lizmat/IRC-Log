@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.11>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.12>:auth<zef:lizmat> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -113,12 +113,10 @@ role IRC::Log::Entry {
     method problems() { $!log.problems }
 
     method prev() {
-        if self.pos -> int $pos {
-            $!log.entries[$pos - 1]
-        }
+        (my int $pos = self.pos) ?? $!log.entries[$pos - 1] !! Nil
     }
     method next() {
-        $!log.entries[self.pos + 1] // Empty
+        $!log.entries[self.pos + 1] // Nil
     }
 
     method prefix(--> '*** ') { }
