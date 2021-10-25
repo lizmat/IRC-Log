@@ -2,6 +2,12 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.13  2021-10-25T23:24:31+02:00
+    - Fix issue with .entries returning an IterationBuffer
+      instead of a List.
+    - Limit values that can be passed to TWEAK for hour, minute,
+      ordinal and pos.
+
 0.0.12  2021-10-24T13:28:40+02:00
     - Subtle change in semantics of .next/.prev.  Instead
       of returning Empty on end reached, they now return Nil

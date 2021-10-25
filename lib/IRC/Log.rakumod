@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.12>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.13>:auth<zef:lizmat> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -74,12 +74,14 @@ role IRC::Log:ver<0.0.12>:auth<zef:lizmat> {
 # Expected messsage types
 
 role IRC::Log::Entry {
-    has     $.log  is built(:bind);
-    has int $!hmop is built(:bind);
-    has str $.nick is built(:bind);
+    has     $.log is built(:bind);
+    has int $!hmop;
+    has str $.nick;
 
-    method TWEAK(int :$hour, int :$minute, int :$ordinal, int :$pos) {
-        $!hmop = $hour +< 56 + $minute +< 48 + $ordinal +< 32 + $pos;
+    method TWEAK(
+      uint8 :$hour, uint8 :$minute, uint16 :$ordinal, uint32 :$pos
+    ) {
+        $!hmop = ($hour +< 56) + ($minute +< 48) + ($ordinal +< 32) + $pos;
     }
 
     method target() {
@@ -108,9 +110,9 @@ role IRC::Log::Entry {
     method minute()   { $!hmop +> 48 +&   0xff }
     method ordinal()  { $!hmop +> 32 +& 0xffff }
     method pos()      { $!hmop       +& 0xffff }
-    method date()     { $!log.date     }
-    method entries()  { $!log.entries  }
-    method problems() { $!log.problems }
+    method date()     { $!log.date         }
+    method entries()  { $!log.entries.List }
+    method problems() { $!log.problems     }
 
     method prev() {
         (my int $pos = self.pos) ?? $!log.entries[$pos - 1] !! Nil
