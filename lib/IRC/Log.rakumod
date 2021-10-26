@@ -1,6 +1,6 @@
 use v6.*;
 
-role IRC::Log:ver<0.0.13>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.14>:auth<zef:lizmat> {
     has Date $.date;
     has Str  $.raw;
     has      $.entries;
@@ -88,22 +88,24 @@ role IRC::Log::Entry {
         my int $hour    = $.hour;
         my int $minute  = $.minute;
         my int $ordinal = $.ordinal;
+        my str $date    = $.date.Str;  # XXX workaround Rakudo issue
 
-        my $target = self.date
+        my $target = $date
           ~ 'Z'
-          ~ ($hour < 10 ?? "0$hour" !! $hour)
+          ~ ($hour < 10 ?? "0$hour" !! $hour)         # cheap sprintf
           ~ ':'
-          ~ ($minute < 10 ?? "0$minute" !! $minute);
+          ~ ($minute < 10 ?? "0$minute" !! $minute);  # cheap sprintf
 
-        $target = $target ~ '-' ~ ($ordinal < 10
-          ?? "000$ordinal"
-          !! $ordinal < 100
-            ?? "00$ordinal"
-            !! $ordinal < 1000
-              ?? "0$ordinal"
-              !! $ordinal
-        ) if $ordinal;
-        $target
+        $ordinal
+          ?? $target ~ '-' ~ ($ordinal < 10           # cheap sprintf
+            ?? "000$ordinal"
+            !! $ordinal < 100
+              ?? "00$ordinal"
+              !! $ordinal < 1000
+                ?? "0$ordinal"
+                !! $ordinal
+            )
+          !! $target
     }
 
     method hour()     { $!hmop +> 56 +&   0xff }
