@@ -2,6 +2,24 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.15  2021-11-10T00:52:31+01:00
+    - Added .nick-names and .entries-of-nick methods
+    - Added .clear method to reset an object for re-parsing
+    - Pretty extensive refactor to save memory, probably a little
+      bit at the expense of CPU.  Each message now consists of at
+      least a "log" attribute, and a so-called hmon attribute (a
+      32bit unsigned integer value containing hour, minute, ordinal
+      and nick-index value).  Nick-names are now stored in a native
+      str array (1-based).  Linking between messages is now done
+      with the $entries and the associated $hmon values.  The %nicks
+      hash is now gone: all there is now is a .entries-of-nick method
+      that lazily produces the entries of the nick given.  This
+      reduces the memory footprint significantly, as well as simplifies
+      updating of any additional messages.  Consumers of the IRC::Log
+      role can simplify their parsing logic, as they no longer need
+      to keep track of position and other stuff.
+    - Added dependency on Array::Sorted::Util
+
 0.0.14  2021-10-26T23:00:36+02:00
     - Work around issue with .target
 

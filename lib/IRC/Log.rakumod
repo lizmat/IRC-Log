@@ -1,25 +1,65 @@
-use v6.*;
+use Array::Sorted::Util:ver<0.0.8>:auth<zef:lizmat>;
 
-role IRC::Log:ver<0.0.14>:auth<zef:lizmat> {
-    has Date $.date;
-    has Str  $.raw;
-    has      $.entries;
-    has Int  $.nr-control-entries;
-    has Int  $.nr-conversation-entries;
-    has      $.last-topic-change;
-    has      @.problems;
-    has      %.nicks;
-    has      %!state;  # hash with final state of internal parsing
+# The compressed "coordinates" of an entry (hour, minute, ordinal, nick-index)
+# or short "hmon", are stored as an unsigned 32bit value, allowing for 512
+# messages within a minute, and up to 4K - 1 different nicks in a (daily) log.
+# 1111 1000 0000 0000 0000 0000 0000 0000  hour
+#       111 1110 0000 0000 0000 0000 0000  minute
+#              1 1111 1111 0000 0000 0000  ordinal
+#                          1111 1111 1111  nick-index
+#
+# Storing coordinates like this in a list, creates a sorted list that can
+# be quickly searched for a given target, but which can also be easily
+# traversed to produce the entries of a given nick-index (without needing
+# to actually access the message entry object itself).
+
+# The following mnemonics apply
+#
+#  hmon - the full compressed hour / minute / ordinal / nick-index informtion
+#  hmo  - just the compressed hour / minute / ordinal info (nick-index is 0)
+#  hm   - just the compressed hour / minute info (ordinal / nick-index are 0)
+
+# Helper subs for conversions
+my sub hm(int $hour, int $minute --> uint32) {
+    $hour +< 27 + $minute +< 21
+}
+my sub hmo(int $hour, int $minute, int $ordinal --> uint32) {
+    $hour +< 27 + $minute +< 21 + $ordinal +< 12
+}
+my sub hmon(int $hour, int $minute, int $ordinal, int $nick-index --> uint32) {
+    $hour +< 27 + $minute +< 21 + $ordinal +< 12 + $nick-index
+}
+my sub hmon2hmo(       uint32 $hmon) { $hmon       +& 0x0fffff000 }
+my sub hmon2hour(      uint32 $hmon) { $hmon +> 27 +&      0x001f }
+my sub hmon2minute(    uint32 $hmon) { $hmon +> 21 +&      0x003f }
+my sub hmon2ordinal(   uint32 $hmon) { $hmon +> 12 +&      0x01ff }
+my sub hmon2nick-index(uint32 $hmon) { $hmon       +&      0x0fff }
+
+my sub target2hmo(str $target) {
+    $target.chars == 20  # yyyy-mm-ddZhh:mm-oooo
+      ?? hmo(+$target.substr(11,2), +$target.substr(14,2), +$target.substr(17))
+      !! hm( +$target.substr(11,2), +$target.substr(14,2))
+}
+
+role IRC::Log:ver<0.0.15>:auth<zef:lizmat> {
+    has Date   $.date;
+    has Str    $.raw;
+    has uint32 @.hmons      is built(False);  # list of "coordinates"
+    has str    @.nick-names is built(False);  # IterationBuffer of nicks
+    has        $.entries    is built(False);  # IterationBuffer of entries
+    has Int    $.nr-control-entries is rw      is built(False);
+    has Int    $.nr-conversation-entries is rw is built(False);
+    has        $.last-topic-change is rw       is built(False);
+    has        $!problems;
+    has        %!state;  # hash with final state of internal parsing
 
 #-------------------------------------------------------------------------------
 # Main log parser logic
 
-    method !INIT() {
-        $!entries := IterationBuffer.CREATE;
-        self
-    }
-
-    method parse(::?CLASS:D: Str:D $slurped, Date:D $date) is implementation-detail {
+    method parse(::?CLASS:D:
+       Str:D $log,
+      Date:D $date
+    ) is implementation-detail {
         ...
     }
 
@@ -35,7 +75,7 @@ role IRC::Log:ver<0.0.14>:auth<zef:lizmat> {
       IO:D $path,
       Date() $date = self.IO2Date($path)
     ) {
-        my $instance := self.CREATE!INIT;
+        my $instance := self.CREATE.clear;
         $instance.parse($path.slurp(:enc("utf8-c8")), $date);
         $instance
     }
@@ -44,13 +84,27 @@ role IRC::Log:ver<0.0.14>:auth<zef:lizmat> {
       Str:D $slurped,
       Date() $date
     ) {
-        my $instance := self.CREATE!INIT;
+        my $instance := self.CREATE.clear;
         $instance.parse($slurped, $date);
         $instance
     }
 
 #-------------------------------------------------------------------------------
 # Instance methods
+
+    method clear(::?CLASS:D:) {
+        @!hmons      = ();
+        $!entries   := IterationBuffer.CREATE;
+        $!problems  := IterationBuffer.CREATE;
+        @!nick-names = "";  # nick name indices are 1-based
+
+        $!nr-control-entries      = 0;
+        $!nr-conversation-entries = 0;
+        $!last-topic-change       = Nil;
+
+        self
+    }
+    method problems(::?CLASS:D:) { $!problems.List }
 
     method first-entry(::?CLASS:D:) { $!entries[0] }
     method last-entry( ::?CLASS:D:) { $!entries[$!entries.elems - 1] }
@@ -59,7 +113,23 @@ role IRC::Log:ver<0.0.14>:auth<zef:lizmat> {
     method last-target( ::?CLASS:D:) { $!entries[$!entries.elems - 1].target }
 
     method this-target(::?CLASS:D: Str:D $target) {
+        my uint32 $hmo = target2hmo($target);
+        my $pos := finds @!hmons, $hmo;
         $!entries.List.first($target eq *.target)
+    }
+
+    method index-of-nick(::?CLASS:D: str $nick) {
+        @!nick-names.first(* eq $nick, :k)
+    }
+    method entries-of-nick(::?CLASS:D: str $nick) {
+        my int $index = self.index-of-nick($nick);
+        (^@!hmons).map: -> int $pos {
+            $!entries[$pos] if hmon2nick-index(@!hmons[$pos]) == $index
+        }
+    }
+
+    method index-of-hmon(::?CLASS:D: uint32 $hmon) {
+        finds @!hmons, $hmon
     }
 
     multi method update(::?CLASS:D: IO:D $path) {
@@ -74,14 +144,24 @@ role IRC::Log:ver<0.0.14>:auth<zef:lizmat> {
 # Expected messsage types
 
 role IRC::Log::Entry {
-    has     $.log is built(:bind);
-    has int $!hmop;
-    has str $.nick;
+    has $.log is built(:bind);
+    has uint32 $!hmon;
 
-    method TWEAK(
-      uint8 :$hour, uint8 :$minute, uint16 :$ordinal, uint32 :$pos
-    ) {
-        $!hmop = ($hour +< 56) + ($minute +< 48) + ($ordinal +< 32) + $pos;
+    method TWEAK(int :$hour, int :$minute, int :$ordinal, str :$nick) {
+        given $!log {
+            my @nick-names := .nick-names;
+            my $nick-index := @nick-names.first(* eq $nick, :k);
+            without $nick-index {
+                $nick-index := @nick-names.elems;
+                @nick-names.push: $nick;
+                die "Too many nicks" if $nick-index > 0x0fff;  # 4K max
+            }
+
+            .entries.push: self;
+            .hmons.push: $!hmon = hmon($hour, $minute, $ordinal, $nick-index);
+            ++.nr-control-entries      if self.control;
+            ++.nr-conversation-entries if self.conversation;
+        }
     }
 
     method target() {
@@ -108,10 +188,13 @@ role IRC::Log::Entry {
           !! $target
     }
 
-    method hour()     { $!hmop +> 56 +&   0xff }
-    method minute()   { $!hmop +> 48 +&   0xff }
-    method ordinal()  { $!hmop +> 32 +& 0xffff }
-    method pos()      { $!hmop       +& 0xffff }
+    method hour()       { hmon2hour       $!hmon }
+    method minute()     { hmon2minute     $!hmon }
+    method ordinal()    { hmon2ordinal    $!hmon }
+    method nick-index() { hmon2nick-index $!hmon }
+    method nick()       { $!log.nick-names[hmon2nick-index $!hmon] }
+    method pos()        { $!log.index-of-hmon: $!hmon }
+
     method date()     { $!log.date         }
     method entries()  { $!log.entries.List }
     method problems() { $!log.problems     }
@@ -148,22 +231,22 @@ role IRC::Log::Entry {
 }
 
 class IRC::Log::Joined does IRC::Log::Entry {
-    method message() { "$!nick joined" }
+    method message() { "$.nick joined" }
 }
 class IRC::Log::Left does IRC::Log::Entry {
-    method message() { "$!nick left" }
+    method message() { "$.nick left" }
 }
 class IRC::Log::Kick does IRC::Log::Entry {
     has Str $.kickee is built(:bind);
     has Str $.spec   is built(:bind);
 
-    method message() { "$!kickee was kicked by $!nick $!spec" }
+    method message() { "$!kickee was kicked by $.nick $!spec" }
 }
 class IRC::Log::Message does IRC::Log::Entry {
     has Str $.text is built(:bind);
 
     method gist() { '[' ~ self.hh-mm ~ '] <' ~ $.nick ~ '> ' ~ $.message }
-    method sender() { $!nick }
+    method sender() { $.nick }
     method message() { $!text }
     method prefix(--> '') { }
     method control(    --> False) { }
@@ -173,25 +256,25 @@ class IRC::Log::Mode does IRC::Log::Entry {
     has Str $.flags is built(:bind);
     has Str @.nicks is built(:bind);
 
-    method message() { "$!nick sets mode: $!flags @.nicks.join(" ")" }
+    method message() { "$.nick sets mode: $!flags @.nicks.join(" ")" }
 }
 class IRC::Log::Nick-Change does IRC::Log::Entry {
     has Str $.new-nick is built(:bind);
 
-    method message() { "$!nick is now known as $!new-nick" }
+    method message() { "$.nick is now known as $!new-nick" }
 }
 class IRC::Log::Self-Reference does IRC::Log::Entry {
     has Str $.text is built(:bind);
 
     method prefix(--> '* ') { }
-    method message() { "$!nick $!text" }
+    method message() { "$.nick $!text" }
     method control(    --> False) { }
     method conversation(--> True) { }
 }
 class IRC::Log::Topic does IRC::Log::Entry {
     has Str $.text is built(:bind);
 
-    method message() { "$!nick changes topic to: $!text" }
+    method message() { "$.nick changes topic to: $!text" }
     method conversation(--> True) { }
 }
 
@@ -277,6 +360,16 @@ it could not.
 
 =head1 INSTANCE METHODS
 
+=head2 date
+
+=begin code :lang<raku>
+
+say $log.date;
+
+=end code
+
+The C<date> instance method returns the C<Date> object for this log.
+
 =head2 entries
 
 =begin code :lang<raku>
@@ -287,7 +380,7 @@ it could not.
 
 =end code
 
-The C<entries> instance method returns an IterationBuffer with entries from
+The C<entries> instance method returns an C<IterationBuffer> with entries from
 the log.  It contains instances of one of the following classes:
 
     IRC::Log::Joined
@@ -299,15 +392,10 @@ the log.  It contains instances of one of the following classes:
     IRC::Log::Self-Reference
     IRC::Log::Topic
 
-=head2 date
+=head2 entries-of-nick
 
-=begin code :lang<raku>
-
-say $log.date;
-
-=end code
-
-The C<date> instance method returns the C<Date> object for this log.
+The C<entries-of-nick> instance method takes a C<nick> as parameter and
+returns an C<Seq> consisting of the entries for that nick.
 
 =head2 first-entry
 
@@ -328,6 +416,17 @@ say $log.first-target;  # 2021-04-23
 =end code
 
 The C<first-target> instance method returns the C<target> of the first entry.
+
+=head2 index-of-nick
+
+=begin code :lang<raku>
+
+say "$nick found at $log.index-of-nick($nick)";
+
+=end code
+
+The C<index-of-nick> instance method returns a the index of the given nick
+in the list of C<nick-names>, or C<Nil> if it can not be found.
 
 =head2 last-entry
 
@@ -360,19 +459,30 @@ say $log.last-topic-change;  # liz changed topic to "hello world"
 The C<last-topic-change> instance method returns the entry that contains the
 last change of topic.  Returns C<Nil> if there wasn't any topic change.
 
+=head2 nick-names
+
+=begin code :lang<raku>
+
+.say for $log.nick-names;
+
+=end code
+
+The C<nick-names> instance method returns a native str array with the
+nick names that have been found in the order they were found.
+
 =head2 nicks
 
 =begin code :lang<raku>
 
-for $log.nicks.sort(*.key) -> (:key($nick), :value($entries)) {
+for $log.nicks -> (:key($nick), :value($entries)) {
     say "$nick has $entries.elems() entries";
 }
 
 =end code
 
-The C<nicks> instance method returns a C<Map> with the nicks seen
-for this log as keys, and an C<IterationBuffer> with entries that originated
-by that nick.
+The C<nicks> instance method returns a C<Map> with the nicks seen for this
+log as keys (in the order they were seen_, and an C<IterationBuffer> with
+entries that originated by that nick.
 
 =head2 nr-control-entries
 
@@ -508,6 +618,10 @@ The next entry in this log (if any).
 =head3 nick
 
 The nick of the user that originated the entry in the log.
+
+=head3 nick-index
+
+The index of the nick in the list of C<nick-names> in the log.
 
 =head3 ordinal
 

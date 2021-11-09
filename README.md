@@ -69,6 +69,15 @@ The `IO2Date` class method interpretes the given `IO::Path` object and attempts 
 INSTANCE METHODS
 ================
 
+date
+----
+
+```raku
+say $log.date;
+```
+
+The `date` instance method returns the `Date` object for this log.
+
 entries
 -------
 
@@ -78,7 +87,7 @@ entries
 .say for $log.entries.Seq.grep(*.conversation);  # only actual conversation
 ```
 
-The `entries` instance method returns an IterationBuffer with entries from the log. It contains instances of one of the following classes:
+The `entries` instance method returns an `IterationBuffer` with entries from the log. It contains instances of one of the following classes:
 
     IRC::Log::Joined
     IRC::Log::Left
@@ -89,14 +98,10 @@ The `entries` instance method returns an IterationBuffer with entries from the l
     IRC::Log::Self-Reference
     IRC::Log::Topic
 
-date
-----
+entries-of-nick
+---------------
 
-```raku
-say $log.date;
-```
-
-The `date` instance method returns the `Date` object for this log.
+The `entries-of-nick` instance method takes a `nick` as parameter and returns an `Seq` consisting of the entries for that nick.
 
 first-entry
 -----------
@@ -115,6 +120,15 @@ say $log.first-target;  # 2021-04-23
 ```
 
 The `first-target` instance method returns the `target` of the first entry.
+
+index-of-nick
+-------------
+
+```raku
+say "$nick found at $log.index-of-nick($nick)";
+```
+
+The `index-of-nick` instance method returns a the index of the given nick in the list of `nick-names`, or `Nil` if it can not be found.
 
 last-entry
 ----------
@@ -143,16 +157,25 @@ say $log.last-topic-change;  # liz changed topic to "hello world"
 
 The `last-topic-change` instance method returns the entry that contains the last change of topic. Returns `Nil` if there wasn't any topic change.
 
+nick-names
+----------
+
+```raku
+.say for $log.nick-names;
+```
+
+The `nick-names` instance method returns a native str array with the nick names that have been found in the order they were found.
+
 nicks
 -----
 
 ```raku
-for $log.nicks.sort(*.key) -> (:key($nick), :value($entries)) {
+for $log.nicks -> (:key($nick), :value($entries)) {
     say "$nick has $entries.elems() entries";
 }
 ```
 
-The `nicks` instance method returns a `Map` with the nicks seen for this log as keys, and an `IterationBuffer` with entries that originated by that nick.
+The `nicks` instance method returns a `Map` with the nicks seen for this log as keys (in the order they were seen_, and an `IterationBuffer` with entries that originated by that nick.
 
 nr-control-entries
 ------------------
@@ -272,6 +295,10 @@ The next entry in this log (if any).
 ### nick
 
 The nick of the user that originated the entry in the log.
+
+### nick-index
+
+The index of the nick in the list of `nick-names` in the log.
 
 ### ordinal
 
