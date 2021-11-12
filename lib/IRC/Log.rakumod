@@ -36,21 +36,21 @@ my sub hmon2ordinal(   uint32 $hmon) { $hmon +> 12 +&      0x01ff }
 my sub hmon2nick-index(uint32 $hmon) { $hmon       +&      0x0fff }
 
 my sub target2hmo(str $target) {
-    $target.chars == 20  # yyyy-mm-ddZhh:mm-oooo
+    $target.chars == 21  # yyyy-mm-ddZhh:mm-oooo
       ?? hmo(+$target.substr(11,2), +$target.substr(14,2), +$target.substr(17))
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.15>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
     has Date   $.date;
     has Str    $.raw;
     has uint32 @.hmons      is built(False);  # list of "coordinates"
-    has str    @.nick-names is built(False);  # IterationBuffer of nicks
+    has str    @.nick-names is built(False);  # unsorted array of nicks
     has        $.entries    is built(False);  # IterationBuffer of entries
+    has        $.problems   is built(False);  # IterationBuffer of problem pairs
     has Int    $.nr-control-entries is rw      is built(False);
     has Int    $.nr-conversation-entries is rw is built(False);
     has        $.last-topic-change is rw       is built(False);
-    has        $!problems;
     has        %!state;  # hash with final state of internal parsing
 
 #-------------------------------------------------------------------------------
@@ -71,19 +71,15 @@ role IRC::Log:ver<0.0.15>:auth<zef:lizmat> {
     }
 
     proto method new(|) {*}
-    multi method new(::?CLASS:U:
-      IO:D $path,
-      Date() $date = self.IO2Date($path)
-    ) {
-        my $instance := self.CREATE.clear;
-        $instance.parse($path.slurp(:enc("utf8-c8")), $date);
-        $instance
+    multi method new(::?CLASS:U: IO:D $path) {
+        self.new: $path.slurp(:enc("utf8-c8")), self.IO2Date($path)
     }
 
-    multi method new(::?CLASS:U:
-      Str:D $slurped,
-      Date() $date
-    ) {
+    multi method new(::?CLASS:U: IO:D $path, Date() $date) {
+        self.new: $path.slurp(:enc("utf8-c8")), $date
+    }
+
+    multi method new(::?CLASS:U: Str:D $slurped, Date() $date) {
         my $instance := self.CREATE.clear;
         $instance.parse($slurped, $date);
         $instance
@@ -104,18 +100,46 @@ role IRC::Log:ver<0.0.15>:auth<zef:lizmat> {
 
         self
     }
-    method problems(::?CLASS:D:) { $!problems.List }
-
     method first-entry(::?CLASS:D:) { $!entries[0] }
     method last-entry( ::?CLASS:D:) { $!entries[$!entries.elems - 1] }
 
     method first-target(::?CLASS:D:) { $!entries[0].target }
     method last-target( ::?CLASS:D:) { $!entries[$!entries.elems - 1].target }
 
-    method this-target(::?CLASS:D: Str:D $target) {
+    method target-index(::?CLASS:D: Str:D $target) {
         my uint32 $hmo = target2hmo($target);
         my $pos := finds @!hmons, $hmo;
-        $!entries.List.first($target eq *.target)
+        hmon2hmo(@!hmons[$pos]) == $hmo ?? $pos.Int !! Nil
+    }
+
+    method target-entry(::?CLASS:D: Str:D $target) {
+        my uint32 $hmo = target2hmo($target);
+        my $pos := finds @!hmons, $hmo;
+        hmon2hmo(@!hmons[$pos]) == $hmo ?? $!entries[$pos] !! Nil
+    }
+
+    method entries-lt-target(::?CLASS:D: Str:D $target) {
+        with self.target-index($target) -> $pos {
+            $!entries.Seq.head($pos)
+        }
+    }
+
+    method entries-le-target(::?CLASS:D: Str:D $target) {
+        with self.target-index($target) -> $pos {
+            $!entries.Seq.head($pos + 1)
+        }
+    }
+
+    method entries-ge-target(::?CLASS:D: Str:D $target) {
+        with self.target-index($target) -> $pos {
+            $!entries.Seq.skip($pos)
+        }
+    }
+
+    method entries-gt-target(::?CLASS:D: Str:D $target) {
+        with self.target-index($target) -> $pos {
+            $!entries.Seq.skip($pos + 1)
+        }
     }
 
     method index-of-nick(::?CLASS:D: str $nick) {
@@ -125,6 +149,19 @@ role IRC::Log:ver<0.0.15>:auth<zef:lizmat> {
         my int $index = self.index-of-nick($nick);
         (^@!hmons).map: -> int $pos {
             $!entries[$pos] if hmon2nick-index(@!hmons[$pos]) == $index
+        }
+    }
+    method entries-of-nicks(::?CLASS:D: @nicks) {
+        my $mask = 0;
+        for @nicks -> str $nick {
+            $mask = $mask +| (1 +< $_)
+              with self.index-of-nick($nick);
+        }
+        if $mask {   # at least one nick found
+            (^@!hmons).map: -> int $pos {
+                $!entries[$pos]
+                  if $mask +& (1 +< hmon2nick-index(@!hmons[$pos]))
+            }
         }
     }
 
@@ -195,9 +232,9 @@ role IRC::Log::Entry {
     method nick()       { $!log.nick-names[hmon2nick-index $!hmon] }
     method pos()        { $!log.index-of-hmon: $!hmon }
 
-    method date()     { $!log.date         }
-    method entries()  { $!log.entries.List }
-    method problems() { $!log.problems     }
+    method date()     { $!log.date     }
+    method entries()  { $!log.entries  }
+    method problems() { $!log.problems }
 
     method prev() {
         (my int $pos = self.pos) ?? $!log.entries[$pos - 1] !! Nil
@@ -374,9 +411,9 @@ The C<date> instance method returns the C<Date> object for this log.
 
 =begin code :lang<raku>
 
-.say for $log.entries.List;                      # all entries
+.say for $log.entries.List;                       # all entries
 
-.say for $log.entries.Seq.grep(*.conversation);  # only actual conversation
+.say for $log.entries.List.grep(*.conversation);  # only actual conversation
 
 =end code
 
@@ -392,10 +429,60 @@ the log.  It contains instances of one of the following classes:
     IRC::Log::Self-Reference
     IRC::Log::Topic
 
+=head2 entries-ge-target
+
+=begin code :lang<raku>
+
+.say for $log.entries-ge-target($target);
+
+=end code
+
+The C<entries-from-target> instance method returns all entries that are
+C<after> B<and> including the given target.
+
+=head2 entries-gt-target
+
+=begin code :lang<raku>
+
+.say for $log.entries-gt-target($target);
+
+=end code
+
+The C<entries-gt-target> instance method returns all entries that are
+C<after> (so B<not> including) the given target.
+
+=head2 entries-le-target
+
+=begin code :lang<raku>
+
+.say for $log.entries-le-target($target);
+
+=end code
+
+The C<entries-le-target> instance method returns all entries that are
+C<before> B<and> including the given target.
+
+=head2 entries-lt-target
+
+=begin code :lang<raku>
+
+.say for $log.entries-lt-target($target);
+
+=end code
+
+The C<entries-lt-target> instance method returns all entries that are
+C<before> (so B<not> including) the given target.
+
 =head2 entries-of-nick
 
+=begin code :lang<raku>
+
+.say for $log.entries-of-nick($nick);
+
+=end code
+
 The C<entries-of-nick> instance method takes a C<nick> as parameter and
-returns an C<Seq> consisting of the entries for that nick.
+returns a C<Seq> consisting of the entries of the given nick.
 
 =head2 first-entry
 
@@ -510,12 +597,12 @@ the number of conversation entries in this log.
 
 =begin code :lang<raku>
 
-.say for $log.problems;
+.say for $log.problems.List;
 
 =end code
 
-The C<problems> instance method returns an array with C<Pair>s of
-lines that could not be interpreted in the log.  The key is a string
+The C<problems> instance method returns an C<IterationBuffer> with C<Pair>s
+of lines that could B<not> be interpreted in the log.  The key is a string
 with the line number and a reason it could not be interpreted.  The
 value is the actual line.
 
@@ -530,6 +617,28 @@ say "contains 'foo'" if $log.raw.contains('foo');
 The C<raw> instance method returns the raw text version of the log.  It can
 e.g. be used to do a quick check whether a string occurs in the raw text,
 before checking C<entries> for a given string.
+
+=head2 target-entry
+
+=begin code :lang<raku>
+
+say "$target has $_" with $log.target-entry($target);
+
+=end code
+
+The C<target-entry> returns the B<entry> of the specified target, or it
+returns C<Nil> if the entry of the target could not be found.
+
+=head2 target-index
+
+=begin code :lang<raku>
+
+say "$target at $_" with $log.target-index($target);
+
+=end code
+
+The C<target-index> returns the B<position> of the specified target in the
+list of C<entries>, or it returns C<Nil> if the target could not be found.
 
 =head2 update
 
@@ -580,7 +689,7 @@ The C<Date> of this entry.
 
 =head3 entries
 
-The C<entries> of the C<log> of this entry.
+The C<entries> of the C<log> of this entry as an C<IterationBuffer>.
 
 =head3 gist
 

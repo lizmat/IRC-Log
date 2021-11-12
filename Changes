@@ -1,6 +1,10 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+    - Rename .this-target to .target-entry
+    - Add methods .target-index, .entries-lt-target, .entries-le-target,
+      .entries-ge-target, .entries-gt-target
+    - The .entries and .problems methods now always return IterationBuffer
 
 0.0.15  2021-11-10T00:52:31+01:00
     - Added .nick-names and .entries-of-nick methods
@@ -17,7 +21,7 @@ Revision history for IRC-Log
       reduces the memory footprint significantly, as well as simplifies
       updating of any additional messages.  Consumers of the IRC::Log
       role can simplify their parsing logic, as they no longer need
-      to keep track of position and other stuff.
+      to keep track of position and other stuff
     - Added dependency on Array::Sorted::Util
 
 0.0.14  2021-10-26T23:00:36+02:00
@@ -25,9 +29,9 @@ Revision history for IRC-Log
 
 0.0.13  2021-10-25T23:24:31+02:00
     - Fix issue with .entries returning an IterationBuffer
-      instead of a List.
+      instead of a List
     - Limit values that can be passed to TWEAK for hour, minute,
-      ordinal and pos.
+      ordinal and pos
 
 0.0.12  2021-10-24T13:28:40+02:00
     - Subtle change in semantics of .next/.prev.  Instead
@@ -38,32 +42,32 @@ Revision history for IRC-Log
     - Fix some documentation typos
 
 0.0.10  2021-09-05T21:23:01+02:00
-    - Move to the zef ecosystem.
+    - Move to the zef ecosystem
 
 0.0.9  2021-08-20T12:43:20+02:00
-    - Delegate handling of last-topic-change to "parse" method.
+    - Delegate handling of last-topic-change to "parse" method
 
 0.0.8  2021-08-20T10:51:15+02:00
-    - Add .last-topic-change instance method.
+    - Add .last-topic-change instance method
 
 0.0.7  2021-06-09T19:47:15+02:00
-    - Add .next / .prev entry methods.
+    - Add .next / .prev entry methods
 
 0.0.6  2021-05-25T17:52:53+02:00
     - Make Message.gist be the same what IRC::Log::Colabti parses
 
 0.0.5  2021-05-23T23:13:45+02:00
-    - Oops.  .new should not return its type object.  Need more tests.
+    - Oops.  .new should not return its type object.  Need more tests
 
 0.0.4  2021-05-23T22:50:25+02:00
     - Changed default branch.
-    - Expect .update to return Nil, 0 or > 0.
+    - Expect .update to return Nil, 0 or > 0
 
 0.0.3  2021-05-19T17:50:07+02:00
-    - Seems tagging got mixed up somehow.
+    - Seems tagging got mixed up somehow
 
 0.0.2  2021-05-19T17:32:10+02:00
-    - Tweaks to make IRC::Log::Colabti work.
+    - Tweaks to make IRC::Log::Colabti work
 
 0.0.1  2021-05-19T17:27:07+02:00
-    - Initial version.
+    - Initial version
