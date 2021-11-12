@@ -42,8 +42,8 @@ my sub target2hmo(str $target) {
 }
 
 role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
-    has Date   $.date;
-    has Str    $.raw;
+    has str    $.date       is built(False);
+    has str    $.raw        is built(False);
     has uint32 @.hmons      is built(False);  # list of "coordinates"
     has str    @.nick-names is built(False);  # unsorted array of nicks
     has        $.entries    is built(False);  # IterationBuffer of entries
@@ -56,9 +56,12 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
 #-------------------------------------------------------------------------------
 # Main log parser logic
 
-    method parse(::?CLASS:D:
-       Str:D $log,
-      Date:D $date
+    method parse-log(::?CLASS:D:
+      str $text,
+          $last-hour    is raw,
+          $last-minute  is raw,
+          $ordinal      is raw,
+          $linenr       is raw,
     ) is implementation-detail {
         ...
     }
@@ -75,31 +78,27 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         self.new: $path.slurp(:enc("utf8-c8")), self.IO2Date($path)
     }
 
-    multi method new(::?CLASS:U: IO:D $path, Date() $date) {
-        self.new: $path.slurp(:enc("utf8-c8")), $date
+    multi method new(::?CLASS:U: IO:D $path, Date() $Date) {
+        self.new: $path.slurp(:enc("utf8-c8")), $Date
     }
 
-    multi method new(::?CLASS:U: Str:D $slurped, Date() $date) {
-        my $instance := self.CREATE.clear;
-        $instance.parse($slurped, $date);
-        $instance
+    method !INIT($text, $Date) {
+        $!date       = $Date.Str;
+        $!entries   := IterationBuffer.CREATE;
+        $!problems  := IterationBuffer.CREATE;
+        @!nick-names = "";  # nick name indices are 1-based
+
+        self.parse($text);
+        self
+    }
+
+    multi method new(::?CLASS:U: Str:D $text, Date() $Date) {
+        self.CREATE!INIT($text, $Date)
     }
 
 #-------------------------------------------------------------------------------
 # Instance methods
 
-    method clear(::?CLASS:D:) {
-        @!hmons      = ();
-        $!entries   := IterationBuffer.CREATE;
-        $!problems  := IterationBuffer.CREATE;
-        @!nick-names = "";  # nick name indices are 1-based
-
-        $!nr-control-entries      = 0;
-        $!nr-conversation-entries = 0;
-        $!last-topic-change       = Nil;
-
-        self
-    }
     method first-entry(::?CLASS:D:) { $!entries[0] }
     method last-entry( ::?CLASS:D:) { $!entries[$!entries.elems - 1] }
 
@@ -120,7 +119,7 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
 
     method entries-lt-target(::?CLASS:D: Str:D $target) {
         with self.target-index($target) -> $pos {
-            $!entries.Seq.head($pos)
+            $!entries.Seq.head($pos) if $pos
         }
     }
 
@@ -132,21 +131,21 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
 
     method entries-ge-target(::?CLASS:D: Str:D $target) {
         with self.target-index($target) -> $pos {
-            $!entries.Seq.skip($pos)
+            $!entries.Seq.skip($pos) if $pos < $!entries.elems
         }
     }
 
     method entries-gt-target(::?CLASS:D: Str:D $target) {
         with self.target-index($target) -> $pos {
-            $!entries.Seq.skip($pos + 1)
+            $!entries.Seq.skip($pos + 1) if $pos < $!entries.elems - 1
         }
     }
 
-    method index-of-nick(::?CLASS:D: str $nick) {
+    method !index-of-nick(::?CLASS:D: str $nick) {
         @!nick-names.first(* eq $nick, :k)
     }
     method entries-of-nick(::?CLASS:D: str $nick) {
-        my int $index = self.index-of-nick($nick);
+        my int $index = self!index-of-nick($nick);
         (^@!hmons).map: -> int $pos {
             $!entries[$pos] if hmon2nick-index(@!hmons[$pos]) == $index
         }
@@ -155,7 +154,7 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         my $mask = 0;
         for @nicks -> str $nick {
             $mask = $mask +| (1 +< $_)
-              with self.index-of-nick($nick);
+              with self!index-of-nick($nick);
         }
         if $mask {   # at least one nick found
             (^@!hmons).map: -> int $pos {
@@ -165,20 +164,75 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         }
     }
 
-    method index-of-hmon(::?CLASS:D: uint32 $hmon) {
-        finds @!hmons, $hmon
+    multi method update(::?CLASS:D: IO:D $path) {
+        self.parse($path.slurp(:enc("utf8-c8")))
+    }
+    multi method update(::?CLASS:D: Str:D $text) {
+        $!raw && $!raw eq $text
+          ?? Empty
+          !! self.parse($text)
     }
 
-    multi method update(::?CLASS:D: IO:D $path) {
-        self.parse($path.slurp(:enc("utf8-c8")), $!date)
-    }
-    multi method update(::?CLASS:D: Str:D $slurped) {
-        self.parse($slurped, $!date)
+#-------------------------------------------------------------------------------
+# Public private methods
+
+    method parse(::?CLASS:D: str $text) is implementation-detail {
+        my str $to-parse;
+        my int $last-hour;
+        my int $last-minute;
+        my int $ordinal;
+        my int $linenr;
+
+        # done a parse before for this object
+        if %!state -> %state {
+
+            # adding new lines on log
+            if $text.starts-with($!raw) {
+                $last-hour   = %state<last-hour>;
+                $last-minute = %state<last-minute>;
+                $ordinal     = %state<ordinal>;
+                $linenr      = %state<linenr>;
+                $to-parse    = $text.substr($!raw.chars);
+            }
+
+            # log appears to be altered, run it from scratch!
+            else {
+                @!hmons      = ();
+                $!entries   := IterationBuffer.CREATE;
+                $!problems  := IterationBuffer.CREATE;
+                @!nick-names = "";  # nick name indices are 1-based
+
+                $!nr-control-entries      = 0;
+                $!nr-conversation-entries = 0;
+                $!last-topic-change       = Nil;
+
+                $last-hour = $last-minute = $linenr = -1;
+                $to-parse  = $text;
+            }
+        }
+
+        # first parse
+        else {
+            $last-hour = $last-minute = $linenr = -1;
+            $to-parse  = $text;
+        }
+
+        my int $initial-nr-entries = $!entries.elems;
+        self.parse-log(
+          $to-parse, $last-hour, $last-minute, $ordinal, $linenr
+        );
+
+        # save current state in case of updates
+        $!raw   = $text;
+        %!state = :$last-hour, :$last-minute, :$ordinal, :$linenr;
+
+        # return new entries
+        $!entries.Seq.skip($initial-nr-entries)
     }
 }
 
 #-------------------------------------------------------------------------------
-# Expected messsage types
+# Expected message types
 
 role IRC::Log::Entry {
     has $.log is built(:bind);
@@ -230,7 +284,8 @@ role IRC::Log::Entry {
     method ordinal()    { hmon2ordinal    $!hmon }
     method nick-index() { hmon2nick-index $!hmon }
     method nick()       { $!log.nick-names[hmon2nick-index $!hmon] }
-    method pos()        { $!log.index-of-hmon: $!hmon }
+    method pos()        { finds $!log.hmons, $!hmon +& 0x0ffffffff }
+#                                      Rakudo issue ^^^^^^^^^^^^^^
 
     method date()     { $!log.date     }
     method entries()  { $!log.entries  }
@@ -252,13 +307,13 @@ role IRC::Log::Entry {
     method control(      --> True) { }
     method conversation(--> False) { }
 
-    method hhmm() { 
+    method hhmm() {
         my int $hour   = $.hour;
         my int $minute = $.minute;
         ($hour < 10 ?? "0$hour" !! $hour)
           ~ ($minute < 10 ?? "0$minute" !! $minute)
     }
-    method hh-mm() { 
+    method hh-mm() {
         my int $hour   = $.hour;
         my int $minute = $.minute;
         ($hour < 10 ?? "0$hour" !! $hour)
@@ -331,10 +386,14 @@ IRC::Log - role providing interface to IRC logs
 use IRC::Log;
 
 class IRC::Log::Foo does IRC::Log {
-    method parse($slurped, $date) {
-        # Nil for already parsed and no change
-        #   0 for initial parse
-        # > 0 number of entries added after update
+    method parse-log(
+      str $text,
+          $last-hour    is raw,
+          $last-minute  is raw,
+          $ordinal      is raw,
+          $linenr       is raw,
+    --> Nil) {
+        ...
     }
 }
 
@@ -353,7 +412,58 @@ IRC::Log provides a role providing an interface to IRC logs in various
 formats.  Each log is supposed to contain all messages from a given
 date.
 
-The C<parse> method must be provided by the consuming class.
+The C<parse-log> method must be provided by the consuming class.
+
+=head1 METHODS TO BE PROVIDED BY CONSUMER
+
+=head2 parse-log
+
+=begin code :lang<raku>
+
+    method parse-log(
+      str $text,
+          $last-hour   is raw,
+          $last-minute is raw,
+          $ordinal     is raw,
+          $linenr      is raw,
+    --> Nil) {
+        ...
+    }
+
+=end code
+
+The C<parse-log> instance method should be provided by the consuming class.
+Examples of the implementation of this method can be found in the
+C<IRC::Log::Colabti> and C<IRC::Log::Textual> modules.
+
+It is supposed to take 5 positional parameters that are assumed to be
+correctly updated by the logic in the C<.parse-log> method.
+
+=item the text to be parsed
+
+The (partial) log to be parsed.
+
+=item the last hour seen as a raw integer
+
+An C<is raw> variable that contains the last hour value seen in messages.
+It is set to -1 the first time, so that it is always unequal to any hour
+value that will be encountered.
+
+=item the last minute seen as a raw integer
+
+An C<is raw> variable that contains the last minute value seen in messages.
+It is set to -1 the first time, so that it is always unequal to any minute
+value that will be encountered.
+
+=item the last ordinal seen as a raw integer
+
+An C<is raw> variable that contains the last ordinal value seen in messages.
+It is set to 0 the first time.
+
+=item the line number of the line last parsed
+
+An C<is raw> variable that contains the line number last parsed in the log.
+It is set to -1 the first time, so that the first line parsed will be 0.
 
 =head1 CLASS METHODS
 
@@ -482,7 +592,18 @@ C<before> (so B<not> including) the given target.
 =end code
 
 The C<entries-of-nick> instance method takes a C<nick> as parameter and
-returns a C<Seq> consisting of the entries of the given nick.
+returns a C<Seq> consisting of the entries of the given nick (if any).
+
+=head2 entries-of-nicks
+
+=begin code :lang<raku>
+
+.say for $log.entries-of-nicks(@nicks);
+
+=end code
+
+The C<entries-of-nicks> instance method takes a list of C<nicks> and
+returns a C<Seq> consisting of the entries of the given nicks (if any).
 
 =head2 first-entry
 
@@ -503,17 +624,6 @@ say $log.first-target;  # 2021-04-23
 =end code
 
 The C<first-target> instance method returns the C<target> of the first entry.
-
-=head2 index-of-nick
-
-=begin code :lang<raku>
-
-say "$nick found at $log.index-of-nick($nick)";
-
-=end code
-
-The C<index-of-nick> instance method returns a the index of the given nick
-in the list of C<nick-names>, or C<Nil> if it can not be found.
 
 =head2 last-entry
 

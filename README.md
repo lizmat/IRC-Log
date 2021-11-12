@@ -12,10 +12,14 @@ SYNOPSIS
 use IRC::Log;
 
 class IRC::Log::Foo does IRC::Log {
-    method parse($slurped, $date) {
-        # Nil for already parsed and no change
-        #   0 for initial parse
-        # > 0 number of entries added after update
+    method parse-log(
+      str $text,
+          $last-hour    is raw,
+          $last-minute  is raw,
+          $ordinal      is raw,
+          $linenr       is raw,
+    --> Nil) {
+        ...
     }
 }
 
@@ -32,7 +36,49 @@ DESCRIPTION
 
 IRC::Log provides a role providing an interface to IRC logs in various formats. Each log is supposed to contain all messages from a given date.
 
-The `parse` method must be provided by the consuming class.
+The `parse-log` method must be provided by the consuming class.
+
+METHODS TO BE PROVIDED BY CONSUMER
+==================================
+
+parse-log
+---------
+
+```raku
+    method parse-log(
+      str $text,
+          $last-hour   is raw,
+          $last-minute is raw,
+          $ordinal     is raw,
+          $linenr      is raw,
+    --> Nil) {
+        ...
+    }
+```
+
+The `parse-log` instance method should be provided by the consuming class. Examples of the implementation of this method can be found in the `IRC::Log::Colabti` and `IRC::Log::Textual` modules.
+
+It is supposed to take 5 positional parameters that are assumed to be correctly updated by the logic in the `.parse-log` method.
+
+  * the text to be parsed
+
+The (partial) log to be parsed.
+
+  * the last hour seen as a raw integer
+
+An `is raw` variable that contains the last hour value seen in messages. It is set to -1 the first time, so that it is always unequal to any hour value that will be encountered.
+
+  * the last minute seen as a raw integer
+
+An `is raw` variable that contains the last minute value seen in messages. It is set to -1 the first time, so that it is always unequal to any minute value that will be encountered.
+
+  * the last ordinal seen as a raw integer
+
+An `is raw` variable that contains the last ordinal value seen in messages. It is set to 0 the first time.
+
+  * the line number of the line last parsed
+
+An `is raw` variable that contains the line number last parsed in the log. It is set to -1 the first time, so that the first line parsed will be 0.
 
 CLASS METHODS
 =============
@@ -82,9 +128,9 @@ entries
 -------
 
 ```raku
-.say for $log.entries.List;                      # all entries
+.say for $log.entries.List;                       # all entries
 
-.say for $log.entries.Seq.grep(*.conversation);  # only actual conversation
+.say for $log.entries.List.grep(*.conversation);  # only actual conversation
 ```
 
 The `entries` instance method returns an `IterationBuffer` with entries from the log. It contains instances of one of the following classes:
@@ -98,10 +144,59 @@ The `entries` instance method returns an `IterationBuffer` with entries from the
     IRC::Log::Self-Reference
     IRC::Log::Topic
 
+entries-ge-target
+-----------------
+
+```raku
+.say for $log.entries-ge-target($target);
+```
+
+The `entries-from-target` instance method returns all entries that are `after` **and** including the given target.
+
+entries-gt-target
+-----------------
+
+```raku
+.say for $log.entries-gt-target($target);
+```
+
+The `entries-gt-target` instance method returns all entries that are `after` (so **not** including) the given target.
+
+entries-le-target
+-----------------
+
+```raku
+.say for $log.entries-le-target($target);
+```
+
+The `entries-le-target` instance method returns all entries that are `before` **and** including the given target.
+
+entries-lt-target
+-----------------
+
+```raku
+.say for $log.entries-lt-target($target);
+```
+
+The `entries-lt-target` instance method returns all entries that are `before` (so **not** including) the given target.
+
 entries-of-nick
 ---------------
 
-The `entries-of-nick` instance method takes a `nick` as parameter and returns an `Seq` consisting of the entries for that nick.
+```raku
+.say for $log.entries-of-nick($nick);
+```
+
+The `entries-of-nick` instance method takes a `nick` as parameter and returns a `Seq` consisting of the entries of the given nick (if any).
+
+entries-of-nicks
+----------------
+
+```raku
+.say for $log.entries-of-nicks(@nicks);
+```
+
+The `entries-of-nicks` instance method takes a list of `nicks` and returns a `Seq` consisting of the entries of the given nicks (if any).
 
 first-entry
 -----------
@@ -120,15 +215,6 @@ say $log.first-target;  # 2021-04-23
 ```
 
 The `first-target` instance method returns the `target` of the first entry.
-
-index-of-nick
--------------
-
-```raku
-say "$nick found at $log.index-of-nick($nick)";
-```
-
-The `index-of-nick` instance method returns a the index of the given nick in the list of `nick-names`, or `Nil` if it can not be found.
 
 last-entry
 ----------
@@ -199,10 +285,10 @@ problems
 --------
 
 ```raku
-.say for $log.problems;
+.say for $log.problems.List;
 ```
 
-The `problems` instance method returns an array with `Pair`s of lines that could not be interpreted in the log. The key is a string with the line number and a reason it could not be interpreted. The value is the actual line.
+The `problems` instance method returns an `IterationBuffer` with `Pair`s of lines that could **not** be interpreted in the log. The key is a string with the line number and a reason it could not be interpreted. The value is the actual line.
 
 raw
 ---
@@ -212,6 +298,24 @@ say "contains 'foo'" if $log.raw.contains('foo');
 ```
 
 The `raw` instance method returns the raw text version of the log. It can e.g. be used to do a quick check whether a string occurs in the raw text, before checking `entries` for a given string.
+
+target-entry
+------------
+
+```raku
+say "$target has $_" with $log.target-entry($target);
+```
+
+The `target-entry` returns the **entry** of the specified target, or it returns `Nil` if the entry of the target could not be found.
+
+target-index
+------------
+
+```raku
+say "$target at $_" with $log.target-index($target);
+```
+
+The `target-index` returns the **position** of the specified target in the list of `entries`, or it returns `Nil` if the target could not be found.
 
 update
 ------
@@ -258,7 +362,7 @@ The `Date` of this entry.
 
 ### entries
 
-The `entries` of the `log` of this entry.
+The `entries` of the `log` of this entry as an `IterationBuffer`.
 
 ### gist
 

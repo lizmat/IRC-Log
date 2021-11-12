@@ -1,10 +1,17 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+
+0.0.16  2021-11-12T18:20:33+01:00
     - Rename .this-target to .target-entry
     - Add methods .target-index, .entries-lt-target, .entries-le-target,
       .entries-ge-target, .entries-gt-target
     - The .entries and .problems methods now always return IterationBuffer
+    - The .parse method now only takes the text to parse
+    - Consuming classes now need to provide a .parse-log method, rather
+      than a .parse method, which is now provided by the role.  This
+      allows some common functionality to be moved from the consumer
+      classes, simplifying them significantly
 
 0.0.15  2021-11-10T00:52:31+01:00
     - Added .nick-names and .entries-of-nick methods
