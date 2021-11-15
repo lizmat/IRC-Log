@@ -6,7 +6,8 @@
   "build-depends": [
   ],
   "depends": [
-    "Array::Sorted::Util:ver<0.0.8>:auth<zef:lizmat>"
+    "Array::Sorted::Util:ver<0.0.8>:auth<zef:lizmat>",
+    "has-word:ver<0.0.1>:auth<zef:lizmat>"
   ],
   "description": "role providing interface to IRC logs",
   "license": "Artistic-2.0",
@@ -22,5 +23,5 @@
   ],
   "test-depends": [
   ],
-  "version": "0.0.16"
+  "version": "0.0.17"
 }

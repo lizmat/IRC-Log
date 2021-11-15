@@ -119,10 +119,19 @@ date
 ----
 
 ```raku
-say $log.date;
+dd $log.date;  # "2021-04-22"
 ```
 
-The `date` instance method returns the `Date` object for this log.
+The `date` instance method returns the string of the date of the log.
+
+Date
+----
+
+```raku
+dd $log.Date;  # Date.new(2021,4,22)
+```
+
+The `Date` instance method returns the date of the log as a `Date` object..
 
 entries
 -------
@@ -299,6 +308,106 @@ say "contains 'foo'" if $log.raw.contains('foo');
 
 The `raw` instance method returns the raw text version of the log. It can e.g. be used to do a quick check whether a string occurs in the raw text, before checking `entries` for a given string.
 
+search
+------
+
+```raku
+.say for $channel.search;             # all entries in chronological order
+
+.say for $channel.search(:reverse);   # all in reverse chronological order
+
+.say for $channel.search(:control);            # control messages only
+
+.say for $channel.search(:conversation);       # conversational messages only
+
+.say for $channel.search(:matches(/ \d+ /);    # matching regex
+
+.say for $channel.search(:starts-with<m:>);    # starting with text
+
+.say for $channel.search(:contains<foo>);      # containing string
+
+.say for $channel.search(:words<foo>);         # containing word
+
+.say for $channel.search(:nicks<lizmat timo>); # for one or more nicks
+
+.say for $channel.search(:lt-target($target);  # entries before target
+
+.say for $channel.search(:le-target($target);  # entries until target
+
+.say for $channel.search(:ge-target($target);  # entries from target
+
+.say for $channel.search(:gt-target($target);  # entries after target
+
+.say for $channel.search(
+  :nicks<lizmat japhb>,
+  :contains<question answer>, :all,
+);
+```
+
+The `search` instance method provides a way to look for specific entries in the log by zero or more criteria and modifiers. The following criteria can be specified:
+
+### all
+
+Modifier. Boolean indicating that if multiple words are specified with `contains`, `starts-with` or `words`, then **all** words should match to include the entry.
+
+### contains
+
+A string consisting of one or more `.words` that the `.message` of an entry should contain to be selected. By default, any of the specified words will cause an entry to be included, unless the `all` modifier has been specified with a `True` value. By default, string matching will be case sensitive, unless the `ignorecase` modifier has been specified with a `True` value.
+
+Implies `conversation` is specified with a `True` value.
+
+### control
+
+Boolean indicating to only include entries that return `True` on their `.control` method.
+
+### conversation
+
+Boolean indicating to only include entries that return `True` on their `.conversation` method.
+
+### ge-target
+
+A string indicating the `.target` of an entry should be equal to, or later than (alphabetically greater than or equal). Specified target may be of a different `date` than of the log.
+
+### gt-target
+
+A string indicating the `.target` of an entry should be later than (alphabetically greater than). Specified target may be of a different `date` than of the log.
+
+### ignorecase
+
+Modifier. Boolean indicating that string checking with `contains`, `starts-with` or `words`, should be done case-insensitively if specified with a `True` value.
+
+### le-target
+
+A string indicating the `.target` of an entry should be equal to, or before (alphabetically less than or equal). Specified target may be of a different `date` than of the log.
+
+### lt-target
+
+A string indicating the `.target` of an entry should be before (alphabetically less than). Specified target may be of a different `date` than of the log.
+
+### matches
+
+A regular expression (aka `Regex` object) that should match the `.message` of an entry to be selected. Implies `conversation` is specified with a `True` value.
+
+### nicks
+
+A string consisting of one or more nick names that should match the sender of the entry to be included.
+
+### reverse
+
+Modifier. Boolean indicating to reverse the order of the selected entries.
+
+### starts-with
+
+A string consisting of one or more `.words` that the `.message` of an entry should start with to be selected. By default, any of the specified words will cause an entry to be included, unless the `all` modifier has been specified with a `True` value. By default, string matching will be case sensitive, unless the `ignorecase` modifier has been specified with a `True` value.
+
+Implies `conversation` is specified with a `True` value.
+
+### words
+
+A string consisting of one or more `.words` that the `.message` of an entry should contain as a word (an alphanumeric string bounded by the non- alphanumeric characters, or the beginning or end of the string) to be selected. By default, any of the specified words will cause an entry to be included, unless the `all` modifier has been specified with a `True` value. By default, string matching will be case sensitive, unless the `ignorecase` modifier has been specified with a `True` value.
+
+Implies `conversation` is specified with a `True` value.
+
 target-entry
 ------------
 
@@ -306,7 +415,7 @@ target-entry
 say "$target has $_" with $log.target-entry($target);
 ```
 
-The `target-entry` returns the **entry** of the specified target, or it returns `Nil` if the entry of the target could not be found.
+The `target-entry` instance method returns the **entry** of the specified target, or it returns `Nil` if the entry of the target could not be found.
 
 target-index
 ------------
@@ -315,7 +424,7 @@ target-index
 say "$target at $_" with $log.target-index($target);
 ```
 
-The `target-index` returns the **position** of the specified target in the list of `entries`, or it returns `Nil` if the target could not be found.
+The `target-index` instance method returns the **position** of the specified target in the list of `entries`, or it returns `Nil` if the target could not be found.
 
 update
 ------

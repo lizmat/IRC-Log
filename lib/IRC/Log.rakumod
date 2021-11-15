@@ -1,4 +1,5 @@
 use Array::Sorted::Util:ver<0.0.8>:auth<zef:lizmat>;
+use has-word:ver<0.0.1>:auth<zef:lizmat>;
 
 # The compressed "coordinates" of an entry (hour, minute, ordinal, nick-index)
 # or short "hmon", are stored as an unsigned 32bit value, allowing for 512
@@ -41,8 +42,9 @@ my sub target2hmo(str $target) {
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
     has str    $.date       is built(False);
+    has Date   $.Date       is built(False);
     has str    $.raw        is built(False);
     has uint32 @.hmons      is built(False);  # list of "coordinates"
     has str    @.nick-names is built(False);  # unsorted array of nicks
@@ -51,6 +53,8 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
     has Int    $.nr-control-entries is rw      is built(False);
     has Int    $.nr-conversation-entries is rw is built(False);
     has        $.last-topic-change is rw       is built(False);
+    has str    $.first-target is built(False);
+    has str    $.last-target  is built(False);
     has        %!state;  # hash with final state of internal parsing
 
 #-------------------------------------------------------------------------------
@@ -83,6 +87,7 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
     }
 
     method !INIT($text, $Date) {
+        $!Date      := $Date;
         $!date       = $Date.Str;
         $!entries   := IterationBuffer.CREATE;
         $!problems  := IterationBuffer.CREATE;
@@ -101,9 +106,6 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
 
     method first-entry(::?CLASS:D:) { $!entries[0] }
     method last-entry( ::?CLASS:D:) { $!entries[$!entries.elems - 1] }
-
-    method first-target(::?CLASS:D:) { $!entries[0].target }
-    method last-target( ::?CLASS:D:) { $!entries[$!entries.elems - 1].target }
 
     method target-index(::?CLASS:D: Str:D $target) {
         my uint32 $hmo = target2hmo($target);
@@ -141,22 +143,26 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         }
     }
 
-    method !index-of-nick(::?CLASS:D: str $nick) {
+    method !index-of-nick(str $nick) {
         @!nick-names.first(* eq $nick, :k)
     }
     method entries-of-nick(::?CLASS:D: str $nick) {
-        my int $index = self!index-of-nick($nick);
-        (^@!hmons).map: -> int $pos {
-            $!entries[$pos] if hmon2nick-index(@!hmons[$pos]) == $index
+        with self!index-of-nick($nick) -> int $index {
+            (^@!hmons).map: -> int $pos {
+                $!entries[$pos] if hmon2nick-index(@!hmons[$pos]) == $index
+            }
         }
     }
-    method entries-of-nicks(::?CLASS:D: @nicks) {
+    method !nicks-mask(@nicks) {
         my $mask = 0;
         for @nicks -> str $nick {
             $mask = $mask +| (1 +< $_)
               with self!index-of-nick($nick);
         }
-        if $mask {   # at least one nick found
+        $mask
+    }
+    method entries-of-nicks(::?CLASS:D: @nicks) {
+        if self!nicks-mask(@nicks) -> $mask {   # at least one nick found
             (^@!hmons).map: -> int $pos {
                 $!entries[$pos]
                   if $mask +& (1 +< hmon2nick-index(@!hmons[$pos]))
@@ -164,13 +170,183 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         }
     }
 
+    method search(::?CLASS:D:
+      :$all,                    # modifier on :contains / :words / :starts-with
+      :$contains,               # messages containing given string(s)
+      :$control,                # just control messages
+      :$conversation is copy,   # just conversational messages
+      :$ge-target    is copy,   # messages after given target inclusive
+      :$gt-target    is copy,   # messages after given target
+      :$ignorecase,             # modifier on :contains / :words / :starts-with
+      :$le-target    is copy,   # messages before given target inclusive
+      :$lt-target    is copy,   # messages before given target
+      :&matches,                # messages matching a regex
+      :$nicks,                  # messages by given nick(s)
+      :$reverse,                # produce results in reverse order
+      :$starts-with,            # messages starting with given string(s)
+      :$words,                  # messages containing given word(s)
+    ) {
+
+        # short-circuit if any target out of range
+        if $lt-target || $le-target -> str $target {
+            return Empty                  if $target lt $!first-target;
+            $lt-target = $le-target = Nil if $target gt $!last-target;
+        }
+        if $ge-target || $gt-target -> str $target {
+            return Empty                  if $target gt $!last-target;
+            $ge-target = $gt-target = Nil if $target lt $!first-target;
+        }
+
+        # short-circuit if there's no text for this to be found, set
+        # conversation flag if there is something to be searched for
+        my @needles;
+        my $needles;
+        if $contains || $starts-with || $words -> $string {
+            @needles  = $string.words;  # save for later
+            $needles := @needles.elems;
+
+            if $all {
+                return Empty
+                  unless $!raw.contains($_, :$ignorecase)
+                  for @needles;
+            }
+            else {
+                return Empty
+                  unless @needles.first: { $!raw.contains($_, :$ignorecase) }
+            }
+            $conversation = True;
+        }
+        elsif &matches.defined {
+            $conversation = True;
+        }
+
+        # set up initial Seq of indices of entries to be checked
+        my $seq;
+        if $lt-target || $le-target -> str $target {
+            with self.target-index($target) -> int $pos is copy {
+                --$pos if $lt-target;
+                $seq := 0 .. $pos if $pos >= 0;
+            }
+            elsif $target gt $!last-target {
+                $seq := ^@!hmons;
+            }
+            return Empty without $seq;
+
+            if $ge-target || $gt-target -> str $target {
+                with self.target-index($target) -> int $pos is copy {
+                    ++$pos if $gt-target;
+                    if $pos > $seq.min {
+                        $pos <= $seq.max
+                          ?? ($seq := $pos .. $seq.max)
+                          !! (return Empty)
+                    }
+                }
+            }
+            $seq := $seq.reverse if $reverse;
+        }
+        elsif $ge-target || $gt-target -> str $target {
+            with self.target-index($target) -> int $pos is copy {
+                ++$pos if $gt-target;
+                $seq := $pos ..^ @!hmons if $pos < @!hmons;
+            }
+            elsif $target lt $!first-target {
+                $seq := ^@!hmons;
+            }
+
+            return Empty without $seq;
+            $seq := $seq.reverse if $reverse;
+        }
+        else {
+            $seq := $reverse ?? (^@!hmons).reverse !! ^@!hmons
+        }
+
+        # limit to nick(s) on the hmon values of the indices
+        if $nicks {
+            if $nicks ~~ List {
+                with self!nicks-mask(@$nicks) -> $mask {
+                    $seq := $seq.map: -> int $pos {
+                        $pos if $mask +& (1 +< hmon2nick-index(@!hmons[$pos]))
+                    }
+                }
+                else {
+                    return Empty;
+                }
+            }
+            else {
+                with self!index-of-nick($nicks) -> int $index {
+                    $seq := $seq.map: -> int $pos {
+                        $pos if hmon2nick-index(@!hmons[$pos]) == $index
+                    }
+                }
+                else {
+                    return Empty;
+                }
+            }
+        }
+
+        # convert indices to entries, while filtering if necessary
+        if $conversation {
+            $seq := $seq.map: -> int $pos {
+                given $!entries[$pos] { $_ if .conversation }
+            }
+        }
+        elsif $control {
+            $seq := $seq.map: -> int $pos {
+                given $!entries[$pos] { $_ if .control }
+            }
+        }
+        else {
+            $seq := $seq.map: -> int $pos { $!entries[$pos] }
+        }
+
+        if $needles {
+            my $message;
+            my &matcher := $contains
+              ?? $all
+                ?? -> str $needle {
+                       $message.contains($needle, :$ignorecase).not
+                   }
+                !! -> str $needle {
+                       $message.contains($needle, :$ignorecase)
+                   }
+              !! $starts-with
+                ?? $all
+                  ?? -> str $needle {
+                         $message.starts-with($needle, :$ignorecase).not
+                     }
+                  !! -> str $needle {
+                         $message.starts-with($needle, :$ignorecase)
+                     }
+                !! $all # and $words
+                  ?? -> str $needle {
+                         has-word($message, $needle, :$ignorecase).not
+                     }
+                  !! -> str $needle {
+                         has-word($message, $needle, :$ignorecase)
+                     }
+
+            $seq := $all
+              ?? $seq.map: {
+                     $message := .message;
+                     $_ unless @needles.first(&matcher)
+                 }
+              !! $seq.map: {
+                     $message := .message;
+                     $_ if     @needles.first(&matcher)
+                 }
+        }
+        elsif &matches.defined {
+            $seq := $seq.map: { $_ if .message.contains(&matches) }
+        }
+
+        $seq
+    }
+
     multi method update(::?CLASS:D: IO:D $path) {
         self.parse($path.slurp(:enc("utf8-c8")))
     }
     multi method update(::?CLASS:D: Str:D $text) {
-        $!raw && $!raw eq $text
-          ?? Empty
-          !! self.parse($text)
+        self.parse($text)
     }
 
 #-------------------------------------------------------------------------------
@@ -182,6 +358,9 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         my int $last-minute;
         my int $ordinal;
         my int $linenr;
+
+        # nothing to do?
+        return Empty if $!raw && $!raw eq $text;
 
         # done a parse before for this object
         if %!state -> %state {
@@ -225,6 +404,8 @@ role IRC::Log:ver<0.0.16>:auth<zef:lizmat> {
         # save current state in case of updates
         $!raw   = $text;
         %!state = :$last-hour, :$last-minute, :$ordinal, :$linenr;
+        $!first-target = $!entries.head.target;
+        $!last-target  = $!entries.tail.target;
 
         # return new entries
         $!entries.Seq.skip($initial-nr-entries)
@@ -511,11 +692,21 @@ it could not.
 
 =begin code :lang<raku>
 
-say $log.date;
+dd $log.date;  # "2021-04-22"
 
 =end code
 
-The C<date> instance method returns the C<Date> object for this log.
+The C<date> instance method returns the string of the date of the log.
+
+=head2 Date
+
+=begin code :lang<raku>
+
+dd $log.Date;  # Date.new(2021,4,22)
+
+=end code
+
+The C<Date> instance method returns the date of the log as a C<Date> object..
 
 =head2 entries
 
@@ -728,6 +919,141 @@ The C<raw> instance method returns the raw text version of the log.  It can
 e.g. be used to do a quick check whether a string occurs in the raw text,
 before checking C<entries> for a given string.
 
+=head2 search
+
+=begin code :lang<raku>
+
+.say for $channel.search;             # all entries in chronological order
+
+.say for $channel.search(:reverse);   # all in reverse chronological order
+
+.say for $channel.search(:control);            # control messages only
+
+.say for $channel.search(:conversation);       # conversational messages only
+
+.say for $channel.search(:matches(/ \d+ /);    # matching regex
+
+.say for $channel.search(:starts-with<m:>);    # starting with text
+
+.say for $channel.search(:contains<foo>);      # containing string
+
+.say for $channel.search(:words<foo>);         # containing word
+
+.say for $channel.search(:nicks<lizmat timo>); # for one or more nicks
+
+.say for $channel.search(:lt-target($target);  # entries before target
+
+.say for $channel.search(:le-target($target);  # entries until target
+
+.say for $channel.search(:ge-target($target);  # entries from target
+
+.say for $channel.search(:gt-target($target);  # entries after target
+
+.say for $channel.search(
+  :nicks<lizmat japhb>,
+  :contains<question answer>, :all,
+);
+
+=end code
+
+The C<search> instance method provides a way to look for specific entries
+in the log by zero or more criteria and modifiers.  The following criteria
+can be specified:
+
+=head3 all
+
+Modifier.  Boolean indicating that if multiple words are specified with
+C<contains>, C<starts-with> or C<words>, then B<all> words should match
+to include the entry.
+
+=head3 contains
+
+A string consisting of one or more C<.words> that the C<.message> of an
+entry should contain to be selected.  By default, any of the specified
+words will cause an entry to be included, unless the C<all> modifier has
+been specified with a C<True> value.  By default, string matching will be
+case sensitive, unless the C<ignorecase> modifier has been specified with
+a C<True> value.
+
+Implies C<conversation> is specified with a C<True> value.
+
+=head3 control
+
+Boolean indicating to only include entries that return C<True> on their
+C<.control> method.
+
+=head3 conversation
+
+Boolean indicating to only include entries that return C<True> on their
+C<.conversation> method.
+
+=head3 ge-target
+
+A string indicating the C<.target> of an entry should be equal to, or later
+than (alphabetically greater than or equal).  Specified target may be of a
+different C<date> than of the log.
+
+=head3 gt-target
+
+A string indicating the C<.target> of an entry should be later than
+(alphabetically greater than).  Specified target may be of a different C<date>
+than of the log.
+
+=head3 ignorecase
+
+Modifier.  Boolean indicating that string checking with C<contains>,
+C<starts-with> or C<words>, should be done case-insensitively if specified
+with a C<True> value.
+
+=head3 le-target
+
+A string indicating the C<.target> of an entry should be equal to, or before
+(alphabetically less than or equal).  Specified target may be of a different
+C<date> than of the log.
+
+=head3 lt-target
+
+A string indicating the C<.target> of an entry should be before (alphabetically
+less than).  Specified target may be of a different C<date> than of the log.
+
+=head3 matches
+
+A regular expression (aka C<Regex> object) that should match the C<.message>
+of an entry to be selected.  Implies C<conversation> is specified with a
+C<True> value.
+
+=head3 nicks
+
+A string consisting of one or more nick names that should match the sender
+of the entry to be included.
+
+=head3 reverse
+
+Modifier.  Boolean indicating to reverse the order of the selected entries.
+
+=head3 starts-with
+
+A string consisting of one or more C<.words> that the C<.message> of an
+entry should start with to be selected.  By default, any of the specified
+words will cause an entry to be included, unless the C<all> modifier has
+been specified with a C<True> value.  By default, string matching will be
+case sensitive, unless the C<ignorecase> modifier has been specified with
+a C<True> value.
+
+Implies C<conversation> is specified with a C<True> value.
+
+=head3 words
+
+A string consisting of one or more C<.words> that the C<.message> of an
+entry should contain as a word (an alphanumeric string bounded by the non-
+alphanumeric characters, or the beginning or end of the string) to be selected.
+By default, any of the specified words will cause an entry to be included,
+unless the C<all> modifier has been specified with a C<True> value.  By
+default, string matching will be case sensitive, unless the C<ignorecase>
+modifier has been specified with a C<True> value.
+
+Implies C<conversation> is specified with a C<True> value.
+
 =head2 target-entry
 
 =begin code :lang<raku>
@@ -736,8 +1062,8 @@ say "$target has $_" with $log.target-entry($target);
 
 =end code
 
-The C<target-entry> returns the B<entry> of the specified target, or it
-returns C<Nil> if the entry of the target could not be found.
+The C<target-entry> instance method returns the B<entry> of the specified
+target, or it returns C<Nil> if the entry of the target could not be found.
 
 =head2 target-index
 
@@ -747,8 +1073,9 @@ say "$target at $_" with $log.target-index($target);
 
 =end code
 
-The C<target-index> returns the B<position> of the specified target in the
-list of C<entries>, or it returns C<Nil> if the target could not be found.
+The C<target-index> instance method returns the B<position> of the specified
+target in the list of C<entries>, or it returns C<Nil> if the target could
+not be found.
 
 =head2 update
 

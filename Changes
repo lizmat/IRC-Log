@@ -1,6 +1,9 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+    - Add full .search capability
+    - Add .Date method
+    - Added dependency on "has-word" module
 
 0.0.16  2021-11-12T18:20:33+01:00
     - Rename .this-target to .target-entry
