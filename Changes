@@ -1,6 +1,8 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+
+0.0.17  2021-11-15T12:30:48+01:00
     - Add full .search capability
     - Add .Date method
     - Added dependency on "has-word" module
