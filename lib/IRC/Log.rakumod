@@ -42,17 +42,17 @@ my sub target2hmo(str $target) {
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
-    has str    $.date       is built(False);
+role IRC::Log:ver<0.0.18>:auth<zef:lizmat> {
     has Date   $.Date       is built(False);
+    has str    $.date       is built(False);
     has str    $.raw        is built(False);
     has uint32 @.hmons      is built(False);  # list of "coordinates"
     has str    @.nick-names is built(False);  # unsorted array of nicks
     has        $.entries    is built(False);  # IterationBuffer of entries
     has        $.problems   is built(False);  # IterationBuffer of problem pairs
-    has Int    $.nr-control-entries is rw      is built(False);
-    has Int    $.nr-conversation-entries is rw is built(False);
-    has        $.last-topic-change is rw       is built(False);
+    has        $.last-topic-change is rw is built(False);
+    has uint32 $.nr-conversation-entries is built(False);
+    has uint32 $.nr-control-entries      is built(False);
     has str    $.first-target is built(False);
     has str    $.last-target  is built(False);
     has        %!state;  # hash with final state of internal parsing
@@ -62,10 +62,12 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
 
     method parse-log(::?CLASS:D:
       str $text,
-          $last-hour    is raw,
-          $last-minute  is raw,
-          $ordinal      is raw,
-          $linenr       is raw,
+          $last-hour               is raw,
+          $last-minute             is raw,
+          $ordinal                 is raw,
+          $linenr                  is raw,
+          $nr-control-entries      is raw,
+          $nr-conversation-entries is raw,
     ) is implementation-detail {
         ...
     }
@@ -161,8 +163,8 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
         }
         $mask
     }
-    method entries-of-nicks(::?CLASS:D: @nicks) {
-        if self!nicks-mask(@nicks) -> $mask {   # at least one nick found
+    method entries-of-nick-names(::?CLASS:D: @nick-names) {
+        if self!nicks-mask(@nick-names) -> $mask {   # at least one nick found
             (^@!hmons).map: -> int $pos {
                 $!entries[$pos]
                   if $mask +& (1 +< hmon2nick-index(@!hmons[$pos]))
@@ -181,9 +183,10 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
       :$le-target    is copy,   # messages before given target inclusive
       :$lt-target    is copy,   # messages before given target
       :&matches,                # messages matching a regex
-      :$nicks,                  # messages by given nick(s)
+      :$nick-names,             # messages by given nick name(s)
       :$reverse,                # produce results in reverse order
       :$starts-with,            # messages starting with given string(s)
+      :$targets,                # messages matching these targets
       :$words,                  # messages containing given word(s)
     ) {
 
@@ -227,9 +230,6 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
                 --$pos if $lt-target;
                 $seq := 0 .. $pos if $pos >= 0;
             }
-            elsif $target gt $!last-target {
-                $seq := ^@!hmons;
-            }
             return Empty without $seq;
 
             if $ge-target || $gt-target -> str $target {
@@ -249,21 +249,30 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
                 ++$pos if $gt-target;
                 $seq := $pos ..^ @!hmons if $pos < @!hmons;
             }
-            elsif $target lt $!first-target {
-                $seq := ^@!hmons;
-            }
 
             return Empty without $seq;
             $seq := $seq.reverse if $reverse;
+        }
+        elsif $targets {
+            if $targets.map( -> str $target {
+                if $target.starts-with($!date) {
+                    $_ with self.target-index($target)
+                }
+            }) -> @pos {
+                $seq := $reverse ?? @pos.sort(-*) !! @pos.sort;
+            }
+            else {
+                return Empty;
+            }
         }
         else {
             $seq := $reverse ?? (^@!hmons).reverse !! ^@!hmons
         }
 
         # limit to nick(s) on the hmon values of the indices
-        if $nicks {
-            if $nicks ~~ List {
-                with self!nicks-mask(@$nicks) -> $mask {
+        if $nick-names {
+            if $nick-names ~~ List {
+                with self!nicks-mask($nick-names.list) -> $mask {
                     $seq := $seq.map: -> int $pos {
                         $pos if $mask +& (1 +< hmon2nick-index(@!hmons[$pos]))
                     }
@@ -273,7 +282,7 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
                 }
             }
             else {
-                with self!index-of-nick($nicks) -> int $index {
+                with self!index-of-nick($nick-names) -> int $index {
                     $seq := $seq.map: -> int $pos {
                         $pos if hmon2nick-index(@!hmons[$pos]) == $index
                     }
@@ -285,15 +294,23 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
         }
 
         # convert indices to entries, while filtering if necessary
-        if $conversation {
-            $seq := $seq.map: -> int $pos {
-                given $!entries[$pos] { $_ if .conversation }
-            }
+        with $conversation {
+            $seq := $seq.map: $conversation
+              ?? -> int $pos {
+                     given $!entries[$pos] { $_ if .conversation }
+                 }
+              !! -> int $pos {
+                     given $!entries[$pos] { $_ unless .conversation }
+                 }
         }
-        elsif $control {
-            $seq := $seq.map: -> int $pos {
-                given $!entries[$pos] { $_ if .control }
-            }
+        orwith $control {
+            $seq := $seq.map: $control
+              ?? -> int $pos {
+                     given $!entries[$pos] { $_ if .control }
+                 }
+              !! -> int $pos {
+                     given $!entries[$pos] { $_ unless .control }
+                 }
         }
         else {
             $seq := $seq.map: -> int $pos { $!entries[$pos] }
@@ -398,7 +415,8 @@ role IRC::Log:ver<0.0.17>:auth<zef:lizmat> {
 
         my int $initial-nr-entries = $!entries.elems;
         self.parse-log(
-          $to-parse, $last-hour, $last-minute, $ordinal, $linenr
+          $to-parse, $last-hour, $last-minute, $ordinal, $linenr,
+          $!nr-control-entries, $!nr-conversation-entries,
         );
 
         # save current state in case of updates
@@ -426,13 +444,11 @@ role IRC::Log::Entry {
             without $nick-index {
                 $nick-index := @nick-names.elems;
                 @nick-names.push: $nick;
-                die "Too many nicks" if $nick-index > 0x0fff;  # 4K max
+                die "Too many nick names" if $nick-index > 0x0fff;  # 4K max
             }
 
             .entries.push: self;
             .hmons.push: $!hmon = hmon($hour, $minute, $ordinal, $nick-index);
-            ++.nr-control-entries      if self.control;
-            ++.nr-conversation-entries if self.conversation;
         }
     }
 
@@ -526,10 +542,10 @@ class IRC::Log::Message does IRC::Log::Entry {
     method conversation(--> True) { }
 }
 class IRC::Log::Mode does IRC::Log::Entry {
-    has Str $.flags is built(:bind);
-    has Str @.nicks is built(:bind);
+    has Str $.flags      is built(:bind);
+    has Str @.nick-names is built(:bind);
 
-    method message() { "$.nick sets mode: $!flags @.nicks.join(" ")" }
+    method message() { "$.nick sets mode: $!flags @.nick-names.join(" ")" }
 }
 class IRC::Log::Nick-Change does IRC::Log::Entry {
     has Str $.new-nick is built(:bind);
@@ -569,10 +585,12 @@ use IRC::Log;
 class IRC::Log::Foo does IRC::Log {
     method parse-log(
       str $text,
-          $last-hour    is raw,
-          $last-minute  is raw,
-          $ordinal      is raw,
-          $linenr       is raw,
+          $last-hour               is raw,
+          $last-minute             is raw,
+          $ordinal                 is raw,
+          $linenr                  is raw,
+          $nr-control-entries      is raw,
+          $nr-conversation-entries is raw,
     --> Nil) {
         ...
     }
@@ -603,10 +621,12 @@ The C<parse-log> method must be provided by the consuming class.
 
     method parse-log(
       str $text,
-          $last-hour   is raw,
-          $last-minute is raw,
-          $ordinal     is raw,
-          $linenr      is raw,
+          $last-hour               is raw,
+          $last-minute             is raw,
+          $ordinal                 is raw,
+          $linenr                  is raw,
+          $nr-control-entries      is raw,
+          $nr-conversation-entries is raw,
     --> Nil) {
         ...
     }
@@ -645,6 +665,16 @@ It is set to 0 the first time.
 
 An C<is raw> variable that contains the line number last parsed in the log.
 It is set to -1 the first time, so that the first line parsed will be 0.
+
+=item the number of control messages seen
+
+An C<is raw> variable that needs to be incremented whenever a control
+message is created.
+
+=item the number of conversation messages seen
+
+An C<is raw> variable that needs to be incremented whenever a conversation
+message is created.
 
 =head1 CLASS METHODS
 
@@ -785,16 +815,16 @@ C<before> (so B<not> including) the given target.
 The C<entries-of-nick> instance method takes a C<nick> as parameter and
 returns a C<Seq> consisting of the entries of the given nick (if any).
 
-=head2 entries-of-nicks
+=head2 entries-of-nick-names
 
 =begin code :lang<raku>
 
-.say for $log.entries-of-nicks(@nicks);
+.say for $log.entries-of-nick-names(@nick-names);
 
 =end code
 
-The C<entries-of-nicks> instance method takes a list of C<nicks> and
-returns a C<Seq> consisting of the entries of the given nicks (if any).
+The C<entries-of-nick-names> instance method takes a list of C<nick-names>
+and returns a C<Seq> consisting of the entries of the given nick names (if any).
 
 =head2 first-entry
 
@@ -857,20 +887,6 @@ last change of topic.  Returns C<Nil> if there wasn't any topic change.
 
 The C<nick-names> instance method returns a native str array with the
 nick names that have been found in the order they were found.
-
-=head2 nicks
-
-=begin code :lang<raku>
-
-for $log.nicks -> (:key($nick), :value($entries)) {
-    say "$nick has $entries.elems() entries";
-}
-
-=end code
-
-The C<nicks> instance method returns a C<Map> with the nicks seen for this
-log as keys (in the order they were seen_, and an C<IterationBuffer> with
-entries that originated by that nick.
 
 =head2 nr-control-entries
 
@@ -939,7 +955,7 @@ before checking C<entries> for a given string.
 
 .say for $channel.search(:words<foo>);         # containing word
 
-.say for $channel.search(:nicks<lizmat timo>); # for one or more nicks
+.say for $channel.search(:nick-names<lizmat timo>); # for one or more nick names
 
 .say for $channel.search(:lt-target($target);  # entries before target
 
@@ -949,8 +965,10 @@ before checking C<entries> for a given string.
 
 .say for $channel.search(:gt-target($target);  # entries after target
 
+.say for $channel.search(:@targets);           # entries of these targets
+
 .say for $channel.search(
-  :nicks<lizmat japhb>,
+  :nick-names<lizmat japhb>,
   :contains<question answer>, :all,
 );
 
@@ -980,12 +998,12 @@ Implies C<conversation> is specified with a C<True> value.
 =head3 control
 
 Boolean indicating to only include entries that return C<True> on their
-C<.control> method.
+C<.control> method.  Defaults to no filtering if not specified.
 
 =head3 conversation
 
 Boolean indicating to only include entries that return C<True> on their
-C<.conversation> method.
+C<.conversation> method.  Defaults to no filtering if not specified.
 
 =head3 ge-target
 
@@ -1022,7 +1040,7 @@ A regular expression (aka C<Regex> object) that should match the C<.message>
 of an entry to be selected.  Implies C<conversation> is specified with a
 C<True> value.
 
-=head3 nicks
+=head3 nick-names
 
 A string consisting of one or more nick names that should match the sender
 of the entry to be included.
@@ -1041,6 +1059,12 @@ case sensitive, unless the C<ignorecase> modifier has been specified with
 a C<True> value.
 
 Implies C<conversation> is specified with a C<True> value.
+
+=head3 targets
+
+One or more target strings indicating the entries to be returned.  Will be
+returned in ascending order, unless C<reverse> is specified with a C<True>
+value.
 
 =head3 words
 
@@ -1231,7 +1255,7 @@ The text that the user entered that resulted in this log entry.
 
 The flags that the user entered that resulted in this log entry.
 
-=head3 nicks
+=head3 nick-names
 
 An array of nicknames (to which the flag setting should be applied)
 that the user entered that resulted in this log entry.

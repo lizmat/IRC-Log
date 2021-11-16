@@ -14,10 +14,12 @@ use IRC::Log;
 class IRC::Log::Foo does IRC::Log {
     method parse-log(
       str $text,
-          $last-hour    is raw,
-          $last-minute  is raw,
-          $ordinal      is raw,
-          $linenr       is raw,
+          $last-hour               is raw,
+          $last-minute             is raw,
+          $ordinal                 is raw,
+          $linenr                  is raw,
+          $nr-control-entries      is raw,
+          $nr-conversation-entries is raw,
     --> Nil) {
         ...
     }
@@ -47,10 +49,12 @@ parse-log
 ```raku
     method parse-log(
       str $text,
-          $last-hour   is raw,
-          $last-minute is raw,
-          $ordinal     is raw,
-          $linenr      is raw,
+          $last-hour               is raw,
+          $last-minute             is raw,
+          $ordinal                 is raw,
+          $linenr                  is raw,
+          $nr-control-entries      is raw,
+          $nr-conversation-entries is raw,
     --> Nil) {
         ...
     }
@@ -79,6 +83,14 @@ An `is raw` variable that contains the last ordinal value seen in messages. It i
   * the line number of the line last parsed
 
 An `is raw` variable that contains the line number last parsed in the log. It is set to -1 the first time, so that the first line parsed will be 0.
+
+  * the number of control messages seen
+
+An `is raw` variable that needs to be incremented whenever a control message is created.
+
+  * the number of conversation messages seen
+
+An `is raw` variable that needs to be incremented whenever a conversation message is created.
 
 CLASS METHODS
 =============
@@ -198,14 +210,14 @@ entries-of-nick
 
 The `entries-of-nick` instance method takes a `nick` as parameter and returns a `Seq` consisting of the entries of the given nick (if any).
 
-entries-of-nicks
-----------------
+entries-of-nick-names
+---------------------
 
 ```raku
-.say for $log.entries-of-nicks(@nicks);
+.say for $log.entries-of-nick-names(@nick-names);
 ```
 
-The `entries-of-nicks` instance method takes a list of `nicks` and returns a `Seq` consisting of the entries of the given nicks (if any).
+The `entries-of-nick-names` instance method takes a list of `nick-names` and returns a `Seq` consisting of the entries of the given nick names (if any).
 
 first-entry
 -----------
@@ -260,17 +272,6 @@ nick-names
 ```
 
 The `nick-names` instance method returns a native str array with the nick names that have been found in the order they were found.
-
-nicks
------
-
-```raku
-for $log.nicks -> (:key($nick), :value($entries)) {
-    say "$nick has $entries.elems() entries";
-}
-```
-
-The `nicks` instance method returns a `Map` with the nicks seen for this log as keys (in the order they were seen_, and an `IterationBuffer` with entries that originated by that nick.
 
 nr-control-entries
 ------------------
@@ -328,7 +329,7 @@ search
 
 .say for $channel.search(:words<foo>);         # containing word
 
-.say for $channel.search(:nicks<lizmat timo>); # for one or more nicks
+.say for $channel.search(:nick-names<lizmat timo>); # for one or more nick names
 
 .say for $channel.search(:lt-target($target);  # entries before target
 
@@ -338,8 +339,10 @@ search
 
 .say for $channel.search(:gt-target($target);  # entries after target
 
+.say for $channel.search(:@targets);           # entries of these targets
+
 .say for $channel.search(
-  :nicks<lizmat japhb>,
+  :nick-names<lizmat japhb>,
   :contains<question answer>, :all,
 );
 ```
@@ -358,11 +361,11 @@ Implies `conversation` is specified with a `True` value.
 
 ### control
 
-Boolean indicating to only include entries that return `True` on their `.control` method.
+Boolean indicating to only include entries that return `True` on their `.control` method. Defaults to no filtering if not specified.
 
 ### conversation
 
-Boolean indicating to only include entries that return `True` on their `.conversation` method.
+Boolean indicating to only include entries that return `True` on their `.conversation` method. Defaults to no filtering if not specified.
 
 ### ge-target
 
@@ -388,7 +391,7 @@ A string indicating the `.target` of an entry should be before (alphabetically l
 
 A regular expression (aka `Regex` object) that should match the `.message` of an entry to be selected. Implies `conversation` is specified with a `True` value.
 
-### nicks
+### nick-names
 
 A string consisting of one or more nick names that should match the sender of the entry to be included.
 
@@ -401,6 +404,10 @@ Modifier. Boolean indicating to reverse the order of the selected entries.
 A string consisting of one or more `.words` that the `.message` of an entry should start with to be selected. By default, any of the specified words will cause an entry to be included, unless the `all` modifier has been specified with a `True` value. By default, string matching will be case sensitive, unless the `ignorecase` modifier has been specified with a `True` value.
 
 Implies `conversation` is specified with a `True` value.
+
+### targets
+
+One or more target strings indicating the entries to be returned. Will be returned in ascending order, unless `reverse` is specified with a `True` value.
 
 ### words
 
@@ -576,7 +583,7 @@ IRC::Log::Mode
 
 The flags that the user entered that resulted in this log entry.
 
-### nicks
+### nick-names
 
 An array of nicknames (to which the flag setting should be applied) that the user entered that resulted in this log entry.
 

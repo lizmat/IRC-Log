@@ -2,6 +2,14 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.18  2021-11-16T21:34:28+01:00
+    - Added support for :targets to .search method
+    - Fixed several other issues with .search found when trying to
+      use it from IRC::Channel::Log
+    - Changed the interface to parse-log, to make parsing a little
+      bit faster and remove the mutability of the .nr-control-entries
+      and .nr.conversation.entries that is no longer needed
+
 0.0.17  2021-11-15T12:30:48+01:00
     - Add full .search capability
     - Add .Date method
