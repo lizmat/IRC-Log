@@ -2,6 +2,14 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.19  2021-11-17T13:55:55+01:00
+    - Add %.nick-indices hash for fast lookup of nick-names, which
+      turned out to be a severe bottleneck in parsing of a log.
+      This change made parsing of the perl6 historical log about
+      2.5x as fast as with 0.0.18, and 20% faster than 0.0.14
+      (before the last refactor).  Memory usage is also down about
+      20% since 0.0.14.
+
 0.0.18  2021-11-16T21:34:28+01:00
     - Added support for :targets to .search method
     - Fixed several other issues with .search found when trying to

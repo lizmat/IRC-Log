@@ -42,20 +42,21 @@ my sub target2hmo(str $target) {
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.18>:auth<zef:lizmat> {
-    has Date   $.Date       is built(False);
-    has str    $.date       is built(False);
-    has str    $.raw        is built(False);
-    has uint32 @.hmons      is built(False);  # list of "coordinates"
-    has str    @.nick-names is built(False);  # unsorted array of nicks
-    has        $.entries    is built(False);  # IterationBuffer of entries
-    has        $.problems   is built(False);  # IterationBuffer of problem pairs
+role IRC::Log:ver<0.0.19>:auth<zef:lizmat> {
+    has Date   $.Date  is built(False);
+    has str    $.date  is built(False);
+    has str    $.raw   is built(False);
+    has uint32 @.hmons is built(False);  # list of "coordinates"
+    has str    @.nick-names   is built(False);  # unsorted array of nicks
+    has        %.nick-indices is built(False);  # hash with nick name -> index
+    has        $.entries  is built(False);  # IterationBuffer of entries
+    has        $.problems is built(False);  # IterationBuffer of problem pairs
     has        $.last-topic-change is rw is built(False);
     has uint32 $.nr-conversation-entries is built(False);
     has uint32 $.nr-control-entries      is built(False);
     has str    $.first-target is built(False);
     has str    $.last-target  is built(False);
-    has        %!state;  # hash with final state of internal parsing
+    has        %!state;       # hash with final state of internal parsing
 
 #-------------------------------------------------------------------------------
 # Main log parser logic
@@ -93,7 +94,8 @@ role IRC::Log:ver<0.0.18>:auth<zef:lizmat> {
         $!date       = $Date.Str;
         $!entries   := IterationBuffer.CREATE;
         $!problems  := IterationBuffer.CREATE;
-        @!nick-names = "";  # nick name indices are 1-based
+        @!nick-names = "";      # nick name indices are 1-based
+        %!nick-indices{""} = 0;
 
         self.parse($text);
         self
@@ -146,7 +148,7 @@ role IRC::Log:ver<0.0.18>:auth<zef:lizmat> {
     }
 
     method !index-of-nick(str $nick) {
-        @!nick-names.first(* eq $nick, :k)
+        %!nick-indices{$nick} // Nil
     }
     method entries-of-nick(::?CLASS:D: str $nick) {
         with self!index-of-nick($nick) -> int $index {
@@ -393,10 +395,11 @@ role IRC::Log:ver<0.0.18>:auth<zef:lizmat> {
 
             # log appears to be altered, run it from scratch!
             else {
-                @!hmons      = ();
-                $!entries   := IterationBuffer.CREATE;
-                $!problems  := IterationBuffer.CREATE;
-                @!nick-names = "";  # nick name indices are 1-based
+                @!hmons        = ();
+                $!entries     := IterationBuffer.CREATE;
+                $!problems    := IterationBuffer.CREATE;
+                @!nick-names   = "";  # nick name indices are 1-based
+                %!nick-indices = "" => 0;
 
                 $!nr-control-entries      = 0;
                 $!nr-conversation-entries = 0;
@@ -439,11 +442,10 @@ role IRC::Log::Entry {
 
     method TWEAK(int :$hour, int :$minute, int :$ordinal, str :$nick) {
         given $!log {
-            my @nick-names := .nick-names;
-            my $nick-index := @nick-names.first(* eq $nick, :k);
-            without $nick-index {
-                $nick-index := @nick-names.elems;
-                @nick-names.push: $nick;
+            my $nick-index := .nick-indices{$nick};
+            unless $nick-index.defined {
+                .nick-indices{$nick} := $nick-index := .nick-names.elems;
+                .nick-names.push: $nick;
                 die "Too many nick names" if $nick-index > 0x0fff;  # 4K max
             }
 
@@ -876,6 +878,17 @@ say $log.last-topic-change;  # liz changed topic to "hello world"
 
 The C<last-topic-change> instance method returns the entry that contains the
 last change of topic.  Returns C<Nil> if there wasn't any topic change.
+
+=head2 nick-indices
+
+=begin code :lang<raku>
+
+.say for $log.nick-indices;
+
+=end code
+
+The C<nick-indices> instance method returns a Hash with the nick names that
+have been found as keys, and the associated ordinal number as value.
 
 =head2 nick-names
 

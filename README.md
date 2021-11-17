@@ -264,6 +264,15 @@ say $log.last-topic-change;  # liz changed topic to "hello world"
 
 The `last-topic-change` instance method returns the entry that contains the last change of topic. Returns `Nil` if there wasn't any topic change.
 
+nick-indices
+------------
+
+```raku
+.say for $log.nick-indices;
+```
+
+The `nick-indices` instance method returns a Hash with the nick names that have been found as keys, and the associated ordinal number as value.
+
 nick-names
 ----------
 
