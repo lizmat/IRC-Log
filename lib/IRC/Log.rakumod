@@ -42,7 +42,7 @@ my sub target2hmo(str $target) {
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.19>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.20>:auth<zef:lizmat> {
     has Date   $.Date  is built(False);
     has str    $.date  is built(False);
     has str    $.raw   is built(False);
@@ -425,8 +425,10 @@ role IRC::Log:ver<0.0.19>:auth<zef:lizmat> {
         # save current state in case of updates
         $!raw   = $text;
         %!state = :$last-hour, :$last-minute, :$ordinal, :$linenr;
-        $!first-target = $!entries.head.target;
-        $!last-target  = $!entries.tail.target;
+        if $!entries.elems {
+            $!first-target = $!entries.head.target;
+            $!last-target  = $!entries.tail.target;
+        }
 
         # return new entries
         $!entries.Seq.skip($initial-nr-entries)

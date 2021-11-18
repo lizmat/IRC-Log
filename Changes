@@ -2,6 +2,9 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.20  2021-11-18T11:58:42+01:00
+    - Make sure an empty log file is properly handled
+
 0.0.19  2021-11-17T13:55:55+01:00
     - Add %.nick-indices hash for fast lookup of nick-names, which
       turned out to be a severe bottleneck in parsing of a log.
