@@ -42,7 +42,7 @@ my sub target2hmo(str $target) {
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.20>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.21>:auth<zef:lizmat> {
     has Date   $.Date  is built(False);
     has str    $.date  is built(False);
     has str    $.raw   is built(False);
@@ -299,19 +299,19 @@ role IRC::Log:ver<0.0.20>:auth<zef:lizmat> {
         with $conversation {
             $seq := $seq.map: $conversation
               ?? -> int $pos {
-                     given $!entries[$pos] { $_ if .conversation }
+                     $_ if .conversation given $!entries[$pos]
                  }
               !! -> int $pos {
-                     given $!entries[$pos] { $_ unless .conversation }
+                     $_ unless .conversation given $!entries[$pos]
                  }
         }
         orwith $control {
             $seq := $seq.map: $control
               ?? -> int $pos {
-                     given $!entries[$pos] { $_ if .control }
+                     $_ if .control given $!entries[$pos]
                  }
               !! -> int $pos {
-                     given $!entries[$pos] { $_ unless .control }
+                     $_ unless .control given $!entries[$pos]
                  }
         }
         else {

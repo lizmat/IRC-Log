@@ -2,6 +2,9 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.21  2021-12-01T21:44:16+01:00
+    - Use less scoping for conversation/control checks
+
 0.0.20  2021-11-18T11:58:42+01:00
     - Make sure an empty log file is properly handled
 
