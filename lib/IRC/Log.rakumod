@@ -36,13 +36,156 @@ my sub hmon2minute(    uint32 $hmon) { $hmon +> 21 +&      0x003f }
 my sub hmon2ordinal(   uint32 $hmon) { $hmon +> 12 +&      0x01ff }
 my sub hmon2nick-index(uint32 $hmon) { $hmon       +&      0x0fff }
 
+my sub hmon2heartbeat(uint32 $hmon) {
+    ($hmon +> 27 +&  0x001f) * 60 + ($hmon +> 21 +& 0x003f)
+}
+
 my sub target2hmo(str $target) {
     $target.chars == 21  # yyyy-mm-ddZhh:mm-oooo
       ?? hmo(+$target.substr(11,2), +$target.substr(14,2), +$target.substr(17))
       !! hm( +$target.substr(11,2), +$target.substr(14,2))
 }
 
-role IRC::Log:ver<0.0.21>:auth<zef:lizmat> {
+#-------------------------------------------------------------------------------
+# Expected message types
+
+role IRC::Log::Entry {
+    has $.log is built(:bind);
+    has uint32 $!hmon;
+
+    method TWEAK(int :$hour, int :$minute, int :$ordinal, str :$nick) {
+        given $!log {
+            my $nick-index := .nick-indices{$nick};
+            unless $nick-index.defined {
+                .nick-indices{$nick} := $nick-index := .nick-names.elems;
+                .nick-names.push: $nick;
+                die "Too many nick names" if $nick-index > 0x0fff;  # 4K max
+            }
+
+            .entries.push: self;
+            .hmons.push: $!hmon = hmon($hour, $minute, $ordinal, $nick-index);
+        }
+    }
+
+    method target() {
+        my int $hour    = $.hour;
+        my int $minute  = $.minute;
+        my int $ordinal = $.ordinal;
+        my str $date    = $.date.Str;  # XXX workaround Rakudo issue
+
+        my $target = $date
+          ~ 'Z'
+          ~ ($hour < 10 ?? "0$hour" !! $hour)         # cheap sprintf
+          ~ ':'
+          ~ ($minute < 10 ?? "0$minute" !! $minute);  # cheap sprintf
+
+        $ordinal
+          ?? $target ~ '-' ~ ($ordinal < 10           # cheap sprintf
+            ?? "000$ordinal"
+            !! $ordinal < 100
+              ?? "00$ordinal"
+              !! $ordinal < 1000
+                ?? "0$ordinal"
+                !! $ordinal
+            )
+          !! $target
+    }
+
+    method hour()       { hmon2hour       $!hmon }
+    method minute()     { hmon2minute     $!hmon }
+    method ordinal()    { hmon2ordinal    $!hmon }
+    method heartbeat()  { hmon2heartbeat  $!hmon }
+    method nick-index() { hmon2nick-index $!hmon }
+    method nick()       { $!log.nick-names[hmon2nick-index $!hmon] }
+    method pos()        { finds $!log.hmons, $!hmon +& 0x0ffffffff }
+#                                      Rakudo issue ^^^^^^^^^^^^^^
+
+    method date()     { $!log.date     }
+    method entries()  { $!log.entries  }
+    method problems() { $!log.problems }
+
+    method prev() {
+        (my int $pos = self.pos) ?? $!log.entries[$pos - 1] !! Nil
+    }
+    method next() {
+        $!log.entries[self.pos + 1] // Nil
+    }
+
+    method prefix(--> '*** ') { }
+    method Str() { self.gist }
+    method gist() {
+        '[' ~ self.hh-mm ~ '] ' ~ self.prefix ~ self.message
+    }
+
+    method sender(--> '') { }
+    method control(      --> True) { }
+    method conversation(--> False) { }
+
+    method hhmm() {
+        my int $hour   = $.hour;
+        my int $minute = $.minute;
+        ($hour < 10 ?? "0$hour" !! $hour)
+          ~ ($minute < 10 ?? "0$minute" !! $minute)
+    }
+    method hh-mm() {
+        my int $hour   = $.hour;
+        my int $minute = $.minute;
+        ($hour < 10 ?? "0$hour" !! $hour)
+          ~ ":"
+          ~ ($minute < 10 ?? "0$minute" !! $minute)
+    }
+}
+
+class IRC::Log::Joined does IRC::Log::Entry {
+    method message() { "$.nick joined" }
+}
+class IRC::Log::Left does IRC::Log::Entry {
+    method message() { "$.nick left" }
+}
+class IRC::Log::Kick does IRC::Log::Entry {
+    has Str $.kickee is built(:bind);
+    has Str $.spec   is built(:bind);
+
+    method message() { "$!kickee was kicked by $.nick $!spec" }
+}
+class IRC::Log::Message does IRC::Log::Entry {
+    has Str $.text is built(:bind);
+
+    method gist() { '[' ~ self.hh-mm ~ '] <' ~ $.nick ~ '> ' ~ $.message }
+    method sender() { $.nick }
+    method message() { $!text }
+    method prefix(--> '') { }
+    method control(    --> False) { }
+    method conversation(--> True) { }
+}
+class IRC::Log::Mode does IRC::Log::Entry {
+    has Str $.flags      is built(:bind);
+    has Str @.nick-names is built(:bind);
+
+    method message() { "$.nick sets mode: $!flags @.nick-names.join(" ")" }
+}
+class IRC::Log::Nick-Change does IRC::Log::Entry {
+    has Str $.new-nick is built(:bind);
+
+    method message() { "$.nick is now known as $!new-nick" }
+}
+class IRC::Log::Self-Reference does IRC::Log::Entry {
+    has Str $.text is built(:bind);
+
+    method prefix(--> '* ') { }
+    method message() { "$.nick $!text" }
+    method control(    --> False) { }
+    method conversation(--> True) { }
+}
+class IRC::Log::Topic does IRC::Log::Entry {
+    has Str $.text is built(:bind);
+
+    method message() { "$.nick changes topic to: $!text" }
+    method conversation(--> True) { }
+
+}
+
+role IRC::Log:ver<0.0.22>:auth<zef:lizmat> {
     has Date   $.Date  is built(False);
     has str    $.date  is built(False);
     has str    $.raw   is built(False);
@@ -173,6 +316,10 @@ role IRC::Log:ver<0.0.21>:auth<zef:lizmat> {
             }
         }
     }
+
+    method gist() { self.List.join("\n") ~ "\n" }
+    method Str()  { self.gist }
+    method List() { $!entries.List.map(*.gist).List }
 
     method search(::?CLASS:D:
       :$all,                    # modifier on :contains / :words / :starts-with
@@ -433,142 +580,17 @@ role IRC::Log:ver<0.0.21>:auth<zef:lizmat> {
         # return new entries
         $!entries.Seq.skip($initial-nr-entries)
     }
-}
 
-#-------------------------------------------------------------------------------
-# Expected message types
-
-role IRC::Log::Entry {
-    has $.log is built(:bind);
-    has uint32 $!hmon;
-
-    method TWEAK(int :$hour, int :$minute, int :$ordinal, str :$nick) {
-        given $!log {
-            my $nick-index := .nick-indices{$nick};
-            unless $nick-index.defined {
-                .nick-indices{$nick} := $nick-index := .nick-names.elems;
-                .nick-names.push: $nick;
-                die "Too many nick names" if $nick-index > 0x0fff;  # 4K max
-            }
-
-            .entries.push: self;
-            .hmons.push: $!hmon = hmon($hour, $minute, $ordinal, $nick-index);
-        }
+    multi sub infix:<eqv>(
+      IRC::Log::Entry:D $left,
+      IRC::Log::Entry:D $right
+    --> Bool:D) {
+        $left.^name eq $right.^name
+          && $left.heartbeat == $right.heartbeat
+          && $left.message   eq $right.message
     }
 
-    method target() {
-        my int $hour    = $.hour;
-        my int $minute  = $.minute;
-        my int $ordinal = $.ordinal;
-        my str $date    = $.date.Str;  # XXX workaround Rakudo issue
-
-        my $target = $date
-          ~ 'Z'
-          ~ ($hour < 10 ?? "0$hour" !! $hour)         # cheap sprintf
-          ~ ':'
-          ~ ($minute < 10 ?? "0$minute" !! $minute);  # cheap sprintf
-
-        $ordinal
-          ?? $target ~ '-' ~ ($ordinal < 10           # cheap sprintf
-            ?? "000$ordinal"
-            !! $ordinal < 100
-              ?? "00$ordinal"
-              !! $ordinal < 1000
-                ?? "0$ordinal"
-                !! $ordinal
-            )
-          !! $target
-    }
-
-    method hour()       { hmon2hour       $!hmon }
-    method minute()     { hmon2minute     $!hmon }
-    method ordinal()    { hmon2ordinal    $!hmon }
-    method nick-index() { hmon2nick-index $!hmon }
-    method nick()       { $!log.nick-names[hmon2nick-index $!hmon] }
-    method pos()        { finds $!log.hmons, $!hmon +& 0x0ffffffff }
-#                                      Rakudo issue ^^^^^^^^^^^^^^
-
-    method date()     { $!log.date     }
-    method entries()  { $!log.entries  }
-    method problems() { $!log.problems }
-
-    method prev() {
-        (my int $pos = self.pos) ?? $!log.entries[$pos - 1] !! Nil
-    }
-    method next() {
-        $!log.entries[self.pos + 1] // Nil
-    }
-
-    method prefix(--> '*** ') { }
-    method gist() {
-        '[' ~ self.hh-mm ~ '] ' ~ self.prefix ~ self.message
-    }
-
-    method sender(--> '') { }
-    method control(      --> True) { }
-    method conversation(--> False) { }
-
-    method hhmm() {
-        my int $hour   = $.hour;
-        my int $minute = $.minute;
-        ($hour < 10 ?? "0$hour" !! $hour)
-          ~ ($minute < 10 ?? "0$minute" !! $minute)
-    }
-    method hh-mm() {
-        my int $hour   = $.hour;
-        my int $minute = $.minute;
-        ($hour < 10 ?? "0$hour" !! $hour)
-          ~ ":"
-          ~ ($minute < 10 ?? "0$minute" !! $minute)
-    }
-}
-
-class IRC::Log::Joined does IRC::Log::Entry {
-    method message() { "$.nick joined" }
-}
-class IRC::Log::Left does IRC::Log::Entry {
-    method message() { "$.nick left" }
-}
-class IRC::Log::Kick does IRC::Log::Entry {
-    has Str $.kickee is built(:bind);
-    has Str $.spec   is built(:bind);
-
-    method message() { "$!kickee was kicked by $.nick $!spec" }
-}
-class IRC::Log::Message does IRC::Log::Entry {
-    has Str $.text is built(:bind);
-
-    method gist() { '[' ~ self.hh-mm ~ '] <' ~ $.nick ~ '> ' ~ $.message }
-    method sender() { $.nick }
-    method message() { $!text }
-    method prefix(--> '') { }
-    method control(    --> False) { }
-    method conversation(--> True) { }
-}
-class IRC::Log::Mode does IRC::Log::Entry {
-    has Str $.flags      is built(:bind);
-    has Str @.nick-names is built(:bind);
-
-    method message() { "$.nick sets mode: $!flags @.nick-names.join(" ")" }
-}
-class IRC::Log::Nick-Change does IRC::Log::Entry {
-    has Str $.new-nick is built(:bind);
-
-    method message() { "$.nick is now known as $!new-nick" }
-}
-class IRC::Log::Self-Reference does IRC::Log::Entry {
-    has Str $.text is built(:bind);
-
-    method prefix(--> '* ') { }
-    method message() { "$.nick $!text" }
-    method control(    --> False) { }
-    method conversation(--> True) { }
-}
-class IRC::Log::Topic does IRC::Log::Entry {
-    has Str $.text is built(:bind);
-
-    method message() { "$.nick changes topic to: $!text" }
-    method conversation(--> True) { }
+    method EXPORT() { Map.new: '&infix:<eqv>' => &infix:<eqv> }
 }
 
 #-------------------------------------------------------------------------------
@@ -599,6 +621,8 @@ class IRC::Log::Foo does IRC::Log {
         ...
     }
 }
+
+sub EXPORT() { IRC::Log::Foo.EXPORT }  # Entry eqv Entry
 
 my $log = IRC::Log::Foo.new($filename.IO);
 
@@ -702,6 +726,19 @@ and a C<Date> as the second parameter.
 
 Any lines that can not be interpreted, are ignored: they are available
 with the C<problems> method.
+
+=head2 EXPORT
+
+=begin code :lang<raku>
+
+sub EXPORT() { IRC::Log::Foo.EXPORT }
+
+=end code
+
+The C<EXPORT> class method returns a C<Map> to be used in an C<EXPORT>
+sub to have the consuming class export an C<eqv> infix operator that can
+quickly see if two C<Entry> objects are equivalent (as in: same type,
+same C<heartbeat> and same C<message>).
 
 =head2 IO2Date
 
@@ -1171,6 +1208,10 @@ The C<entries> of the C<log> of this entry as an C<IterationBuffer>.
 
 Create the string representation of the entry as it originally occurred
 in the log.
+
+=head3 heartbeat
+
+An integer for the absolute minute in the day (basically the hh * 60 + mm).
 
 =head3 hhmm
 

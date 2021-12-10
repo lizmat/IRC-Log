@@ -2,6 +2,10 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.22  2021-12-10T22:21:16+01:00
+    - Add support for .heartbeat Entry instance method
+    - Add support for EXPORT class method
+
 0.0.21  2021-12-01T21:44:16+01:00
     - Use less scoping for conversation/control checks
 

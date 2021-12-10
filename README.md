@@ -25,6 +25,8 @@ class IRC::Log::Foo does IRC::Log {
     }
 }
 
+sub EXPORT() { IRC::Log::Foo.EXPORT }  # Entry eqv Entry
+
 my $log = IRC::Log::Foo.new($filename.IO);
 
 say "Logs from $log.date()";
@@ -109,6 +111,15 @@ The `new` class method either takes an `IO` object as the first parameter, and a
 Or it will take a `Str` as the first parameter for the text of the log, and a `Date` as the second parameter.
 
 Any lines that can not be interpreted, are ignored: they are available with the `problems` method.
+
+EXPORT
+------
+
+```raku
+sub EXPORT() { IRC::Log::Foo.EXPORT }
+```
+
+The `EXPORT` class method returns a `Map` to be used in an `EXPORT` sub to have the consuming class export an `eqv` infix operator that can quickly see if two `Entry` objects are equivalent (as in: same type, same `heartbeat` and same `message`).
 
 IO2Date
 -------
@@ -492,6 +503,10 @@ The `entries` of the `log` of this entry as an `IterationBuffer`.
 ### gist
 
 Create the string representation of the entry as it originally occurred in the log.
+
+### heartbeat
+
+An integer for the absolute minute in the day (basically the hh * 60 + mm).
 
 ### hhmm
 
