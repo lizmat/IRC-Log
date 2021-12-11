@@ -2,6 +2,9 @@ Revision history for IRC-Log
 
 {{$NEXT}}
 
+0.0.24  2021-12-11T20:11:49+01:00
+    - Remove .merge method, it can only work on IRC::Log::Colabti
+
 0.0.23  2021-12-11T14:33:15+01:00
     - Add support for .merge method
 
