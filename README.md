@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/lizmat/IRC-Log/workflows/test/badge.svg)](https://github.com/lizmat/IRC-Log/actions)
+[![Actions Status](https://github.com/lizmat/IRC-Log/actions/workflows/linux.yml/badge.svg)](https://github.com/lizmat/IRC-Log/actions) [![Actions Status](https://github.com/lizmat/IRC-Log/actions/workflows/macos.yml/badge.svg)](https://github.com/lizmat/IRC-Log/actions) [![Actions Status](https://github.com/lizmat/IRC-Log/actions/workflows/windows.yml/badge.svg)](https://github.com/lizmat/IRC-Log/actions)
 
 NAME
 ====
@@ -167,14 +167,21 @@ entries
 
 The `entries` instance method returns an `IterationBuffer` with entries from the log. It contains instances of one of the following classes:
 
-    IRC::Log::Joined
-    IRC::Log::Left
-    IRC::Log::Kick
-    IRC::Log::Message
-    IRC::Log::Mode
-    IRC::Log::Nick-Change
-    IRC::Log::Self-Reference
-    IRC::Log::Topic
+  * IRC::Log::Joined
+
+  * IRC::Log::Left
+
+  * IRC::Log::Kick
+
+  * IRC::Log::Message
+
+  * IRC::Log::Mode
+
+  * IRC::Log::Nick-Change
+
+  * IRC::Log::Self-Reference
+
+  * IRC::Log::Topic
 
 entries-ge-target
 -----------------
@@ -475,12 +482,17 @@ Returns `True` if this entry is a control message. Else, it returns `False`.
 
 These entry types are considered control messages:
 
-    IRC::Log::Joined
-    IRC::Log::Left
-    IRC::Log::Kick
-    IRC::Log::Mode
-    IRC::Log::Nick-Change
-    IRC::Log::Topic
+  * IRC::Log::Joined
+
+  * IRC::Log::Left
+
+  * IRC::Log::Kick
+
+  * IRC::Log::Mode
+
+  * IRC::Log::Nick-Change
+
+  * IRC::Log::Topic
 
 ### conversation
 
@@ -488,9 +500,11 @@ Returns `True` if this entry is part of a conversation. Else, it returns `False`
 
 These entry types are considered conversational messages:
 
-    IRC::Log::Message
-    IRC::Log::Self-Reference
-    IRC::Log::Topic
+  * IRC::Log::Message
+
+  * IRC::Log::Self-Reference
+
+  * IRC::Log::Topic
 
 ### date
 
@@ -642,7 +656,7 @@ Source can be located at: https://github.com/lizmat/IRC-Log . Comments and Pull 
 COPYRIGHT AND LICENSE
 =====================
 
-Copyright 2021 Elizabeth Mattijsen
+Copyright 2021, 2025 Elizabeth Mattijsen
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

@@ -1,6 +1,10 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+    - Up dependencies to keep in sync
+    - Add CI badge for each OS
+    - Add sponsor link and button
+    - Update copyright year
 
 0.0.24  2021-12-11T20:11:49+01:00
     - Remove .merge method, it can only work on IRC::Log::Colabti
