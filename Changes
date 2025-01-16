@@ -1,6 +1,8 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+
+0.0.25  2025-01-16T11:42:44+01:00
     - Up dependencies to keep in sync
     - Add CI badge for each OS
     - Add sponsor link and button

@@ -185,7 +185,7 @@ class IRC::Log::Topic does IRC::Log::Entry {
 
 }
 
-role IRC::Log:ver<0.0.24>:auth<zef:lizmat> {
+role IRC::Log:ver<0.0.25>:auth<zef:lizmat> {
     has Date   $.Date  is built(False);
     has str    $.date  is built(False);
     has str    $.raw   is built(False);
