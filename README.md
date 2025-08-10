@@ -101,9 +101,9 @@ new
 ---
 
 ```raku
-my $log = IRC::Log::Foo.new($filename.IO);
+my $log-from-file = IRC::Log::Foo.new($filename.IO);
 
-my $log = IRC::Log::Foo.new($text, $date);
+my $log-from-text = IRC::Log::Foo.new($text, $date);
 ```
 
 The `new` class method either takes an `IO` object as the first parameter, and a `Date` object as the optional second parameter (eliding the `Date` from the basename if not specified), and returns an instantiated object representing the entries in that log file.

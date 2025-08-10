@@ -7,7 +7,6 @@ IRC::Log - role providing interface to IRC logs
 =head1 SYNOPSIS
 
 =begin code :lang<raku>
-
 use IRC::Log;
 
 class IRC::Log::Foo does IRC::Log {
@@ -32,7 +31,6 @@ say "Logs from $log.date()";
 .say for $log.entries.List;
 
 my $log = IRC::Log::Foo.new($text, $date);
-
 =end code
 
 =head1 DESCRIPTION
@@ -48,7 +46,6 @@ The C<parse-log> method must be provided by the consuming class.
 =head2 parse-log
 
 =begin code :lang<raku>
-
     method parse-log(
       str $text,
           $last-hour               is raw,
@@ -60,7 +57,6 @@ The C<parse-log> method must be provided by the consuming class.
     --> Nil) {
         ...
     }
-
 =end code
 
 The C<parse-log> instance method should be provided by the consuming class.
@@ -111,11 +107,9 @@ message is created.
 =head2 new
 
 =begin code :lang<raku>
+my $log-from-file = IRC::Log::Foo.new($filename.IO);
 
-my $log = IRC::Log::Foo.new($filename.IO);
-
-my $log = IRC::Log::Foo.new($text, $date);
-
+my $log-from-text = IRC::Log::Foo.new($text, $date);
 =end code
 
 The C<new> class method either takes an C<IO> object as the first parameter,
@@ -132,9 +126,7 @@ with the C<problems> method.
 =head2 EXPORT
 
 =begin code :lang<raku>
-
 sub EXPORT() { IRC::Log::Foo.EXPORT }
-
 =end code
 
 The C<EXPORT> class method returns a C<Map> to be used in an C<EXPORT>
@@ -145,14 +137,12 @@ same C<heartbeat> and same C<message>).
 =head2 IO2Date
 
 =begin code :lang<raku>
-
 with IRC::Log::Foo.IO2Date($path) -> $date {
     say "the date of $path is $date";
 }
 else {
     say "$path does not appear to be a log file";
 }
-
 =end code
 
 The C<IO2Date> class method interpretes the given C<IO::Path> object
@@ -164,9 +154,7 @@ it could not.
 =head2 date
 
 =begin code :lang<raku>
-
 dd $log.date;  # "2021-04-22"
-
 =end code
 
 The C<date> instance method returns the string of the date of the log.
@@ -174,9 +162,7 @@ The C<date> instance method returns the string of the date of the log.
 =head2 Date
 
 =begin code :lang<raku>
-
 dd $log.Date;  # Date.new(2021,4,22)
-
 =end code
 
 The C<Date> instance method returns the date of the log as a C<Date> object..
@@ -184,11 +170,9 @@ The C<Date> instance method returns the date of the log as a C<Date> object..
 =head2 entries
 
 =begin code :lang<raku>
-
 .say for $log.entries.List;                       # all entries
 
 .say for $log.entries.List.grep(*.conversation);  # only actual conversation
-
 =end code
 
 The C<entries> instance method returns an C<IterationBuffer> with entries from
@@ -206,9 +190,7 @@ the log.  It contains instances of one of the following classes:
 =head2 entries-ge-target
 
 =begin code :lang<raku>
-
 .say for $log.entries-ge-target($target);
-
 =end code
 
 The C<entries-from-target> instance method returns all entries that are
@@ -217,9 +199,7 @@ C<after> B<and> including the given target.
 =head2 entries-gt-target
 
 =begin code :lang<raku>
-
 .say for $log.entries-gt-target($target);
-
 =end code
 
 The C<entries-gt-target> instance method returns all entries that are
@@ -228,9 +208,7 @@ C<after> (so B<not> including) the given target.
 =head2 entries-le-target
 
 =begin code :lang<raku>
-
 .say for $log.entries-le-target($target);
-
 =end code
 
 The C<entries-le-target> instance method returns all entries that are
@@ -239,9 +217,7 @@ C<before> B<and> including the given target.
 =head2 entries-lt-target
 
 =begin code :lang<raku>
-
 .say for $log.entries-lt-target($target);
-
 =end code
 
 The C<entries-lt-target> instance method returns all entries that are
@@ -250,9 +226,7 @@ C<before> (so B<not> including) the given target.
 =head2 entries-of-nick
 
 =begin code :lang<raku>
-
 .say for $log.entries-of-nick($nick);
-
 =end code
 
 The C<entries-of-nick> instance method takes a C<nick> as parameter and
@@ -261,9 +235,7 @@ returns a C<Seq> consisting of the entries of the given nick (if any).
 =head2 entries-of-nick-names
 
 =begin code :lang<raku>
-
 .say for $log.entries-of-nick-names(@nick-names);
-
 =end code
 
 The C<entries-of-nick-names> instance method takes a list of C<nick-names>
@@ -272,9 +244,7 @@ and returns a C<Seq> consisting of the entries of the given nick names (if any).
 =head2 first-entry
 
 =begin code :lang<raku>
-
 say $log.first-entry;
-
 =end code
 
 The C<first-entry> instance method returns the first entry of the log.
@@ -282,9 +252,7 @@ The C<first-entry> instance method returns the first entry of the log.
 =head2 first-target
 
 =begin code :lang<raku>
-
 say $log.first-target;  # 2021-04-23
-
 =end code
 
 The C<first-target> instance method returns the C<target> of the first entry.
@@ -292,9 +260,7 @@ The C<first-target> instance method returns the C<target> of the first entry.
 =head2 last-entry
 
 =begin code :lang<raku>
-
 say $log.last-entry;
-
 =end code
 
 The C<last-entry> instance method returns the last entry of the log.
@@ -302,9 +268,7 @@ The C<last-entry> instance method returns the last entry of the log.
 =head2 last-target
 
 =begin code :lang<raku>
-
 say $log.last-target;  # 2021-04-29
-
 =end code
 
 The C<last-target> instance method returns the C<target> of the last entry.
@@ -312,9 +276,7 @@ The C<last-target> instance method returns the C<target> of the last entry.
 =head2 last-topic-change
 
 =begin code :lang<raku>
-
 say $log.last-topic-change;  # liz changed topic to "hello world"
-
 =end code
 
 The C<last-topic-change> instance method returns the entry that contains the
@@ -323,9 +285,7 @@ last change of topic.  Returns C<Nil> if there wasn't any topic change.
 =head2 nick-indices
 
 =begin code :lang<raku>
-
 .say for $log.nick-indices;
-
 =end code
 
 The C<nick-indices> instance method returns a Hash with the nick names that
@@ -334,9 +294,7 @@ have been found as keys, and the associated ordinal number as value.
 =head2 nick-names
 
 =begin code :lang<raku>
-
 .say for $log.nick-names;
-
 =end code
 
 The C<nick-names> instance method returns a native str array with the
@@ -345,9 +303,7 @@ nick names that have been found in the order they were found.
 =head2 nr-control-entries
 
 =begin code :lang<raku>
-
 say $log.nr-control-entries;
-
 =end code
 
 The C<nr-control-entries> instance method returns an integer representing
@@ -356,9 +312,7 @@ the number of control entries in this log.  It is calculated lazily
 =head2 nr-conversation-entries
 
 =begin code :lang<raku>
-
 say $log.nr-conversation-entries;
-
 =end code
 
 The C<nr-conversation-entries> instance method returns an integer representing
@@ -367,9 +321,7 @@ the number of conversation entries in this log.
 =head2 problems
 
 =begin code :lang<raku>
-
 .say for $log.problems.List;
-
 =end code
 
 The C<problems> instance method returns an C<IterationBuffer> with C<Pair>s
@@ -380,9 +332,7 @@ value is the actual line.
 =head2 raw
 
 =begin code :lang<raku>
-
 say "contains 'foo'" if $log.raw.contains('foo');
-
 =end code
 
 The C<raw> instance method returns the raw text version of the log.  It can
@@ -392,7 +342,6 @@ before checking C<entries> for a given string.
 =head2 search
 
 =begin code :lang<raku>
-
 .say for $channel.search;             # all entries in chronological order
 
 .say for $channel.search(:reverse);   # all in reverse chronological order
@@ -425,7 +374,6 @@ before checking C<entries> for a given string.
   :nick-names<lizmat japhb>,
   :contains<question answer>, :all,
 );
-
 =end code
 
 The C<search> instance method provides a way to look for specific entries
@@ -535,9 +483,7 @@ Implies C<conversation> is specified with a C<True> value.
 =head2 target-entry
 
 =begin code :lang<raku>
-
 say "$target has $_" with $log.target-entry($target);
-
 =end code
 
 The C<target-entry> instance method returns the B<entry> of the specified
@@ -546,9 +492,7 @@ target, or it returns C<Nil> if the entry of the target could not be found.
 =head2 target-index
 
 =begin code :lang<raku>
-
 say "$target at $_" with $log.target-index($target);
-
 =end code
 
 The C<target-index> instance method returns the B<position> of the specified
@@ -558,11 +502,9 @@ not be found.
 =head2 update
 
 =begin code :lang<raku>
-
 $log.update($filename.IO);  # add any entries added to file
 
 $log.update($slurped);      # add any entries added to string
-
 =end code
 
 The C<update> instance method allows updating a log with any additional
