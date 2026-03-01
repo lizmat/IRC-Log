@@ -1,6 +1,8 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+
+0.0.26  2026-03-01T14:26:09+01:00
     - Up dependencies to keep in sync
     - Tightened up "has-word" exports
     - Modernize META
