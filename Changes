@@ -1,6 +1,10 @@
 Revision history for IRC-Log
 
 {{$NEXT}}
+    - Up dependencies to keep in sync
+    - Tightened up "has-word" exports
+    - Modernize META
+    - Update copyright year
 
 0.0.25  2025-01-16T11:42:44+01:00
     - Up dependencies to keep in sync

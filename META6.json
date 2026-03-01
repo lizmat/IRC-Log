@@ -9,7 +9,7 @@
     "runtime": {
       "requires": [
         "Array::Sorted::Util:ver<0.0.11+>:auth<zef:lizmat>",
-        "has-word:ver<0.0.6+>:auth<zef:lizmat>"
+        "has-word:ver<0.0.7+>:auth<zef:lizmat>"
       ]
     }
   },
@@ -25,6 +25,7 @@
   "source-url": "https://github.com/lizmat/IRC-Log.git",
   "support": {
     "bugtracker": "https://github.com/lizmat/IRC-Log/issues",
+    "email": "liz@raku.rocks",
     "source": "https://github.com/lizmat/IRC-Log.git"
   },
   "tags": [

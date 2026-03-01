@@ -1,5 +1,5 @@
 use Array::Sorted::Util:ver<0.0.11+>:auth<zef:lizmat>;
-use has-word:ver<0.0.6+>:auth<zef:lizmat>;
+use has-word:ver<0.0.7+>:auth<zef:lizmat> <has-word>;
 
 # The compressed "coordinates" of an entry (hour, minute, ordinal, nick-index)
 # or short "hmon", are stored as an unsigned 32bit value, allowing for 512
